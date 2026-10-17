@@ -13,6 +13,7 @@ export default function SignUp() {
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [resent, setResent] = useState(false)
+  const [existingAccount, setExistingAccount] = useState(false)
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -32,6 +33,10 @@ export default function SignUp() {
     }
     if (data.session) {
       window.location.assign('/onboarding')
+      return
+    }
+    if (data.user && data.user.identities?.length === 0) {
+      setExistingAccount(true)
       return
     }
     setSent(true)
@@ -55,18 +60,37 @@ export default function SignUp() {
       <div className="auth-backdrop" aria-hidden="true"><span /><span /><span /></div>
       <Link href="/" className="auth-brand"><span className="brand-mark">a</span>Aqua<span className="brand-light">Dairy</span></Link>
       <section className="auth-card animate-in">
-        {sent ? (
+        {existingAccount ? (
+          <div className="verify-state">
+            <div className="verify-illustration" aria-hidden="true"><span>↗</span><i /><b /></div>
+            <span className="eyebrow">YOU ALREADY HAVE A PLACE HERE</span>
+            <h1>Try signing in instead.</h1>
+            <p>We couldn&apos;t confirm that a new account was created for <strong>{email}</strong>. If you already have an account, sign in to continue. If it still needs email verification, you can request another confirmation link below.</p>
+            <Link className="button-primary auth-continue-button" href="/auth/signin">Go to sign in <span aria-hidden="true">→</span></Link>
+            {resent ? (
+              <p className="success-message form-message" role="status">
+                Verification request accepted. If this account still needs confirmation, check your inbox and spam folder. Delivery depends on your email provider settings.
+              </p>
+            ) : (
+              <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy}>
+                {busy ? 'Requesting a link…' : 'Need to verify? Request a new link'}
+              </button>
+            )}
+            {error && <p className="form-message error-message" role="alert">{error}</p>}
+            <p className="auth-switch">Need a different account? <button className="quiet-link" type="button" onClick={() => { setExistingAccount(false); setError('') }}>Back to sign up</button></p>
+          </div>
+        ) : sent ? (
           <div className="verify-state">
             <div className="verify-illustration" aria-hidden="true"><span>✉</span><i /><b /></div>
             <span className="eyebrow">ONE LAST STEP</span>
             <h1>Check your inbox.</h1>
-            <p>We sent a verification link to <strong>{email}</strong>. Open it to confirm your email and we&apos;ll bring you straight back here to set up your farm.</p>
+            <p>If this is a new account, check <strong>{email}</strong> for a verification link. Open it to confirm your email and continue to farm setup. Also check spam or promotions; email delivery depends on your Supabase Auth email configuration.</p>
             <div className="verify-steps">
               <span><b>01</b> Open the email from Aqua Dairy</span>
               <span><b>02</b> Tap “Confirm your email”</span>
               <span><b>03</b> Add your farm, pond, and first cycle</span>
             </div>
-            {resent ? <p className="success-message form-message" role="status">A fresh verification link is on its way.</p> : <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy}>Didn&apos;t get the email? Send another</button>}
+            {resent ? <p className="success-message form-message" role="status">Verification request accepted. If this account still needs confirmation, check your inbox and spam folder. Delivery depends on your email provider settings.</p> : <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy}>Didn&apos;t get the email? Request another link</button>}
             {error && <p className="form-message error-message" role="alert">{error}</p>}
             <p className="auth-switch">Already confirmed? <Link href="/auth/signin">Sign in</Link></p>
           </div>

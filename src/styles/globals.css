@@ -258,6 +258,8 @@ textarea:focus-visible {
 .verify-steps span { display: flex; align-items: center; gap: 12px; color: #61776b; font-size: 11px; }
 .verify-steps b { color: #80a28b; font-size: 9px; }
 .quiet-link { border: 0; background: transparent; cursor: pointer; font-size: 11px; }
+.auth-continue-button { margin: 8px 0 18px; }
+.resend-signin-link { justify-self: start; text-align: left; }
 
 /* Logged-in workspace */
 .workspace { min-height: 100vh; }

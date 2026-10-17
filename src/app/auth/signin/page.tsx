@@ -12,6 +12,9 @@ export default function SignIn() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [needsVerification, setNeedsVerification] = useState(false)
+  const [resendNotice, setResendNotice] = useState('')
+  const [resending, setResending] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -27,9 +30,15 @@ export default function SignIn() {
     setBusy(true)
     setError('')
     setNotice('')
+    setNeedsVerification(false)
+    setResendNotice('')
     const { error: signinError } = await supabase.auth.signInWithPassword({ email, password })
     if (signinError) {
       setError(signinError.message)
+      setNeedsVerification(
+        signinError.code === 'email_not_confirmed' ||
+          signinError.message.toLowerCase().includes('email not confirmed'),
+      )
       setBusy(false)
       return
     }
@@ -49,6 +58,26 @@ export default function SignIn() {
     window.location.assign(next)
   }
 
+  async function resendVerification() {
+    setResending(true)
+    setError('')
+    setResendNotice('')
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+      },
+    })
+    setResending(false)
+    if (resendError) setError(resendError.message)
+    else {
+      setResendNotice(
+        'Verification request accepted. If this account still needs confirmation, check your inbox and spam folder.',
+      )
+    }
+  }
+
   return (
     <main className="auth-page">
       <div className="auth-backdrop" aria-hidden="true"><span /><span /><span /></div>
@@ -62,6 +91,17 @@ export default function SignIn() {
           <label className="field"><span>Email address</span><Input type="email" autoComplete="email" placeholder="you@yourfarm.com" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
           <label className="field"><span>Password</span><Input type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
           {error && <p className="form-message error-message" role="alert">{error}</p>}
+          {needsVerification && (
+            <button
+              className="quiet-link resend-signin-link"
+              type="button"
+              onClick={resendVerification}
+              disabled={resending || !email}
+            >
+              {resending ? 'Requesting a link…' : 'Resend verification email'}
+            </button>
+          )}
+          {resendNotice && <p className="form-message success-message" role="status">{resendNotice}</p>}
           <Button type="submit" className="button-primary submit-button" disabled={busy}>{busy ? 'Signing you in…' : 'Sign in to your farm'} <span aria-hidden="true">→</span></Button>
         </form>
         <p className="auth-switch">New to Aqua Dairy? <Link href="/auth/signup">Create an account</Link></p>

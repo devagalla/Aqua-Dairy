@@ -177,10 +177,7 @@ create policy "farm owners can delete farms" on farms
 
 drop policy if exists "members can view farm memberships" on farm_members;
 create policy "members can view farm memberships" on farm_members
-  for select using (
-    user_id = auth.uid()
-    or is_farm_owner(farm_id)
-  );
+  for select using (user_id = auth.uid());
 
 drop policy if exists "farm owners can add members" on farm_members;
 create policy "farm owners can add members" on farm_members
