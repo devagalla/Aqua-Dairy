@@ -582,7 +582,7 @@ project_id = "aqua-dairy"
 db_password = "{secure_password}"
 
 [auth]
-site_url = "https://aqua-dairy.vercel.app"
+site_url = "https://www.aquadairy.xyz"
 jwt_secret = "{secure_jwt_secret}"
 enable_anonymous_sign_ins = false
 
@@ -1257,7 +1257,7 @@ ENCRYPTION_KEY={encryption-key}
 │  │  └─────────────┘  └─────────────┘  └─────────────┘      │  │
 │  │  ┌─────────────────────────────────────────────────────┐│  │
 │  │  │  Production Deployment                               ││  │
-│  │  │  https://aqua-dairy.vercel.app                        ││  │
+│  │  │  https://www.aquadairy.xyz                            ││  │
 │  │  └─────────────────────────────────────────────────────┘│  │
 │  └─────────────────────────────────────────────────────────┘  │
 │                            │                                      │
