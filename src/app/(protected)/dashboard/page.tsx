@@ -8,7 +8,7 @@ type Overview = {
   farmName: string
   pondCount: number
   cycleCount: number
-  latestWater: { pH: number | null; do_mg_l: number | null; logged_at: string } | null
+  latestWater: { ph: number | null; do_mg_l: number | null; logged_at: string } | null
   latestGrowth: { average_weight_g: number; sampled_at: string } | null
   totalFeed: number
   totalExpenses: number
@@ -43,7 +43,7 @@ export default function Dashboard() {
         supabase.from('farms').select('name').order('created_at').limit(1),
         supabase.from('ponds').select('id', { count: 'exact', head: true }),
         supabase.from('culture_cycles').select('id', { count: 'exact', head: true }),
-        supabase.from('water_logs').select('pH, do_mg_l, logged_at').order('logged_at', { ascending: false }).limit(1),
+        supabase.from('water_logs').select('ph, do_mg_l, logged_at').order('logged_at', { ascending: false }).limit(1),
         supabase.from('growth_samples').select('average_weight_g, sampled_at').order('sampled_at', { ascending: false }).limit(1),
         supabase.from('feed_logs').select('amount_kg'),
         supabase.from('expenses').select('amount'),
@@ -109,7 +109,7 @@ export default function Dashboard() {
         </article>
         <article className="stat-card animate-in animate-delay-3">
           <span className="stat-label">Latest pH</span>
-          <strong>{overview.loading ? '—' : overview.latestWater?.pH ?? '—'}</strong>
+          <strong>{overview.loading ? '—' : overview.latestWater?.ph ?? '—'}</strong>
           <span className="stat-note">{overview.latestWater ? `checked ${new Date(overview.latestWater.logged_at).toLocaleDateString()}` : 'add your first water reading'}</span>
           <span className="stat-sparkline violet-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
@@ -141,7 +141,7 @@ export default function Dashboard() {
           <div className="card-heading"><div><span className="eyebrow">POND HEALTH</span><h2>Latest water reading</h2></div><span className="insight-glyph">◌</span></div>
           {overview.latestWater ? (
             <div className="reading-row">
-              <div><span className="reading-number">{overview.latestWater.pH ?? '—'}</span><span className="reading-unit">pH</span></div>
+              <div><span className="reading-number">{overview.latestWater.ph ?? '—'}</span><span className="reading-unit">pH</span></div>
               <div><span className="reading-number">{overview.latestWater.do_mg_l ?? '—'}</span><span className="reading-unit">mg/L oxygen</span></div>
               <span className="reading-date">{new Date(overview.latestWater.logged_at).toLocaleString()}</span>
             </div>

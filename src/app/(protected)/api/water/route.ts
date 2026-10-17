@@ -29,7 +29,20 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('water_logs')
-    .insert({ ...result.data, created_at: new Date().toISOString() })
+    .insert({
+      cycle_id: result.data.cycle_id,
+      logged_at: result.data.logged_at,
+      temperature_c: result.data.temperature_c,
+      ph: result.data.pH,
+      do_mg_l: result.data.do_mg_l,
+      salinity_pps: result.data.salinity_pps,
+      ammonia_mg_l: result.data.ammonia_mg_l,
+      nitrite_mg_l: result.data.nitrite_mg_l,
+      alkalinity_ppms: result.data.alkalinity_ppms,
+      transparency_lux: result.data.transparency_lux,
+      comment: result.data.comment,
+      created_at: new Date().toISOString(),
+    })
     .select()
     .single()
 

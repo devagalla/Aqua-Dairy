@@ -395,7 +395,7 @@ function recentTitle(kind: RecordKind, record: RecentRecord) {
 }
 
 function recentValue(kind: RecordKind, record: RecentRecord) {
-  if (kind === 'water') return `pH ${displayValue(record.pH)}`
+  if (kind === 'water') return `pH ${displayValue(record.ph)}`
   if (kind === 'feed') return `${displayValue(record.amount_kg)} kg`
   if (kind === 'growth') return `${displayValue(record.average_weight_g)} g avg.`
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(record.amount))
