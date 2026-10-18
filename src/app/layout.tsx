@@ -1,4 +1,5 @@
 import '../styles/globals.css'
+import { LenisProvider } from '@/components/providers/lenis-provider'
 
 export const metadata = {
   title: 'Aqua Dairy',
@@ -11,7 +12,9 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LenisProvider>{children}</LenisProvider>
+      </body>
     </html>
   )
 }
