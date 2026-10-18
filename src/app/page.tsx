@@ -7,9 +7,9 @@ export const metadata = {
 }
 
 const highlights = [
-  { number: '01', title: 'Know your water', text: 'A clearer picture of pond conditions, with early signals when readings drift.' },
-  { number: '02', title: 'Follow every cycle', text: 'Keep feedings and growth samples connected to the pond they came from.' },
-  { number: '03', title: 'Make costs visible', text: 'Bring farm expenses into the same calm, organized daily workflow.' },
+  { number: '01', title: 'Know your water', text: 'A clearer picture of pond conditions, with early signals when readings drift.', telugu: 'చెరువు నీటి పరిస్థితిని గమనించి, మార్పులను ముందే గుర్తించండి.' },
+  { number: '02', title: 'Follow every cycle', text: 'Keep feedings and growth samples connected to the pond they came from.', telugu: 'మేత, ఎదుగుదల వివరాలు ఏ చెరువువో మర్చిపోకుండా ఒకచోట చూడండి.' },
+  { number: '03', title: 'Make costs visible', text: 'Bring farm expenses into the same calm, organized daily workflow.', telugu: 'ఫారం ఖర్చులన్నీ ఒకచోట రాసి, ఎక్కడ ఎంత ఖర్చవుతోందో తెలుసుకోండి.' },
 ]
 
 export default function HomePage() {
@@ -29,6 +29,7 @@ export default function HomePage() {
           <span className="hero-kicker"><span className="status-pulse" /> MADE FOR THE PEOPLE BEHIND THE POND</span>
           <h1>Good water.<br /><em>Good growth.</em><br />A better harvest.</h1>
           <p>A quieter, clearer way to manage your shrimp farm—from the first water check to the final harvest.</p>
+          <span className="telugu-subtitle" lang="te">నీటి పరీక్ష నుంచి కోత వరకు, మీ రొయ్యల ఫారం వివరాలన్నీ ఒకచోట సులభంగా చూసుకోండి.</span>
           <div className="hero-buttons">
             <Link href="/auth/signup" className="button-primary">Start your farm journal <span aria-hidden="true">→</span></Link>
             <Link href="/auth/signin" className="button-text">I already have an account <span aria-hidden="true">↗</span></Link>
@@ -68,7 +69,7 @@ export default function HomePage() {
           {highlights.map((item) => (
             <article className="feature-item" key={item.number}>
               <span className="feature-number">{item.number}</span>
-              <div><h3>{item.title}</h3><p>{item.text}</p></div>
+              <div><h3>{item.title}</h3><p>{item.text}</p><span className="telugu-subtitle" lang="te">{item.telugu}</span></div>
               <span className="feature-arrow" aria-hidden="true">↗</span>
             </article>
           ))}

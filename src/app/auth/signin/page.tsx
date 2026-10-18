@@ -86,10 +86,11 @@ export default function SignIn() {
         <span className="eyebrow">WELCOME BACK</span>
         <h1>Good to have you back.</h1>
         <p className="auth-intro">Your ponds have a story to tell. Pick up right where you left off.</p>
+        <span className="telugu-subtitle" lang="te">మీ చెరువు వివరాలు కొనసాగించడానికి మీ ఖాతాలోకి ప్రవేశించండి.</span>
         {notice && <p className="form-message success-message" role="status">{notice}</p>}
         <form className="auth-form" onSubmit={submit}>
-          <label className="field"><span>Email address</span><Input type="email" autoComplete="email" placeholder="you@yourfarm.com" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-          <label className="field"><span>Password</span><Input type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
+          <label className="field"><span>Email address</span><Input type="email" autoComplete="email" placeholder="you@yourfarm.com" value={email} onChange={(event) => setEmail(event.target.value)} required /><span className="telugu-hint" lang="te">ఖాతా తెరిచేటప్పుడు వాడిన ఈమెయిల్ నమోదు చేయండి.</span></label>
+          <label className="field"><span>Password</span><Input type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={(event) => setPassword(event.target.value)} required /><span className="telugu-hint" lang="te">మీ ఖాతా పాస్‌వర్డ్ నమోదు చేయండి.</span></label>
           {error && <p className="form-message error-message" role="alert">{error}</p>}
           {needsVerification && (
             <button

@@ -77,6 +77,7 @@ export default function Dashboard() {
           <span className="hero-kicker"><span className="status-pulse" /> YOUR FARM AT A GLANCE</span>
           <h1>{overview.farmName ? `Good to see you at ${overview.farmName}.` : 'A clearer view of your farm starts here.'}</h1>
           <p>Small observations today make stronger harvests tomorrow.</p>
+          <span className="telugu-subtitle" lang="te">ఈరోజు చేసే చిన్న గమనింపులే రేపటి మంచి దిగుబడికి తోడ్పడతాయి.</span>
           <Link href="/ponds" className="hero-action">Manage ponds &amp; cycles <span aria-hidden="true">→</span></Link>
         </div>
         <div className="hero-pond-art" aria-hidden="true">
@@ -96,25 +97,25 @@ export default function Dashboard() {
 
       <section className="stats-grid" aria-label="Farm summary">
         <article className="stat-card animate-in animate-delay">
-          <span className="stat-label">Active ponds</span>
+          <span className="stat-label">Active ponds <span className="eyebrow-te" lang="te">నడుస్తున్న చెరువులు</span></span>
           <strong>{overview.loading ? '—' : overview.pondCount.toString().padStart(2, '0')}</strong>
           <span className="stat-note">across your farm</span>
           <span className="stat-sparkline aqua-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
         <article className="stat-card animate-in animate-delay-2">
-          <span className="stat-label">Culture cycles</span>
+          <span className="stat-label">Culture cycles <span className="eyebrow-te" lang="te">పెంపకం బ్యాచ్‌లు</span></span>
           <strong>{overview.loading ? '—' : overview.cycleCount.toString().padStart(2, '0')}</strong>
           <span className="stat-note">growing right now</span>
           <span className="stat-sparkline green-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
         <article className="stat-card animate-in animate-delay-3">
-          <span className="stat-label">Latest pH</span>
+          <span className="stat-label">Latest pH <span className="eyebrow-te" lang="te">నీటి కొలత</span></span>
           <strong>{overview.loading ? '—' : overview.latestWater?.ph ?? '—'}</strong>
           <span className="stat-note">{overview.latestWater ? `checked ${new Date(overview.latestWater.logged_at).toLocaleDateString()}` : 'add your first water reading'}</span>
           <span className="stat-sparkline violet-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
         <article className="stat-card animate-in animate-delay-4">
-          <span className="stat-label">Average weight</span>
+          <span className="stat-label">Average weight <span className="eyebrow-te" lang="te">సగటు బరువు</span></span>
           <strong>{overview.loading ? '—' : overview.latestGrowth ? `${overview.latestGrowth.average_weight_g}g` : '—'}</strong>
           <span className="stat-note">{overview.latestGrowth ? 'latest sample' : 'log a growth sample'}</span>
           <span className="stat-sparkline amber-spark" aria-hidden="true">⌁⌁⌁</span>
@@ -150,7 +151,7 @@ export default function Dashboard() {
         </article>
         <article className="card-surface dashboard-insight">
           <div className="card-heading"><div><span className="eyebrow">KEEP MOMENTUM</span><h2>Your farm journal</h2></div><span className="insight-glyph warm">✳</span></div>
-          <p className="quiet-state">Record feed, growth, and expenses as they happen. Your entries will build a history you can act on.</p>
+          <p className="quiet-state bilingual-copy">Record feed, growth, and expenses as they happen. Your entries will build a history you can act on.<span className="telugu-subtitle" lang="te">మేత, రొయ్యల ఎదుగుదల, ఖర్చులు జరిగినప్పుడే నమోదు చేయండి. తర్వాత మొత్తం వివరాలు సులభంగా చూసుకోవచ్చు.</span></p>
           <Link href="/feed" className="text-link">Add a feeding <span aria-hidden="true">→</span></Link>
         </article>
       </section>

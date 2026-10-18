@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { TeluguHint } from '@/components/ui/telugu-hint'
 import { supabase } from '@/lib/supabase/client'
 
 type RecordKind = 'water' | 'feed' | 'growth' | 'expenses'
@@ -16,12 +17,13 @@ type RecentRecord = Record<string, string | number | null>
 
 const config: Record<
   RecordKind,
-  { title: string; eyebrow: string; description: string; table: string; dateColumn: string; cta: string }
+  { title: string; eyebrow: string; description: string; teluguDescription: string; table: string; dateColumn: string; cta: string }
 > = {
   water: {
     title: 'Water quality',
     eyebrow: 'POND CONDITIONS',
     description: 'Log the readings that keep your shrimp healthy and your water in balance.',
+    teluguDescription: 'చెరువు నీటి పరిస్థితి తెలుసుకోవడానికి ఈ రీడింగ్‌లు నమోదు చేయండి.',
     table: 'water_logs',
     dateColumn: 'logged_at',
     cta: 'Save water log',
@@ -30,6 +32,7 @@ const config: Record<
     title: 'Feed log',
     eyebrow: 'DAILY ROUTINE',
     description: 'Track what you feed, how much, and when—so every cycle tells a clearer story.',
+    teluguDescription: 'ఏ మేత, ఎంత మోతాదులో, ఎప్పుడు ఇచ్చారో నమోదు చేయండి.',
     table: 'feed_logs',
     dateColumn: 'logged_at',
     cta: 'Save feeding',
@@ -38,6 +41,7 @@ const config: Record<
     title: 'Growth sampling',
     eyebrow: 'CYCLE PROGRESS',
     description: 'Record sample size and average body weight to see how your stock is growing.',
+    teluguDescription: 'కొన్ని రొయ్యలను తూచి సగటు బరువు నమోదు చేస్తే పెరుగుదల తెలుస్తుంది.',
     table: 'growth_samples',
     dateColumn: 'sampled_at',
     cta: 'Save sample',
@@ -46,6 +50,7 @@ const config: Record<
     title: 'Farm expenses',
     eyebrow: 'FARM FINANCES',
     description: 'Keep farm costs together and see where your operating budget is going.',
+    teluguDescription: 'ఫారం ఖర్చులు తేదీ, రకం, మొత్తంతో ఇక్కడ నమోదు చేయండి.',
     table: 'expenses',
     dateColumn: 'spent_at',
     cta: 'Save expense',
@@ -231,6 +236,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
           <span className="eyebrow">{page.eyebrow}</span>
           <h1>{page.title}</h1>
           <p>{page.description}</p>
+          <span className="telugu-subtitle" lang="te">{page.teluguDescription}</span>
         </div>
         <span className="heading-orbit" aria-hidden="true">
           {kind === 'water' ? '◌' : kind === 'feed' ? '◈' : kind === 'growth' ? '↗' : '＄'}
@@ -264,6 +270,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                     <select required value={farmId} onChange={(event) => setFarmId(event.target.value)}>
                       {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}
                     </select>
+                    <TeluguHint>ఈ ఖర్చు ఏ ఫారానికి చెందుతుందో ఎంచుకోండి.</TeluguHint>
                   </label>
                 ) : (
                   <label className="field">
@@ -275,6 +282,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                         </option>
                       ))}
                     </select>
+                    <TeluguHint>ఈ వివరాలు ఏ చెరువు పెంపకం బ్యాచ్‌కు చెందుతాయో ఎంచుకోండి.</TeluguHint>
                     {selectedCycle && <small>This record will be linked to {selectedCycle.pond?.name ?? 'your selected pond'}.</small>}
                   </label>
                 )}
@@ -282,40 +290,40 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                 {kind === 'feed' && (
                   <>
                     <div className="field-grid">
-                      <label className="field"><span>Feed type</span><input name="feed_type" placeholder="e.g. Grower pellet" required /></label>
-                      <label className="field"><span>Amount (kg)</span><input name="amount_kg" type="number" min="0.01" step="0.01" placeholder="25" required /></label>
+                      <label className="field"><span>Feed type</span><input name="feed_type" placeholder="e.g. Grower pellet" required /><TeluguHint>ఇచ్చిన మేత పేరు లేదా రకం రాయండి.</TeluguHint></label>
+                      <label className="field"><span>Amount (kg)</span><input name="amount_kg" type="number" min="0.01" step="0.01" placeholder="25" required /><TeluguHint>ఈసారి ఇచ్చిన మేత కిలోలలో.</TeluguHint></label>
                     </div>
                     <div className="field-grid">
-                      <label className="field"><span>Date &amp; time</span><input name="logged_at" type="datetime-local" defaultValue={localDateTime()} required /></label>
-                      <label className="field"><span>Frequency</span><input name="feeding_frequency" placeholder="e.g. 3 times daily" /></label>
+                      <label className="field"><span>Date &amp; time</span><input name="logged_at" type="datetime-local" defaultValue={localDateTime()} required /><TeluguHint>మేత ఇచ్చిన తేదీ, సమయం.</TeluguHint></label>
+                      <label className="field"><span>Frequency</span><input name="feeding_frequency" placeholder="e.g. 3 times daily" /><TeluguHint>రోజుకు ఎన్నిసార్లు మేత వేస్తున్నారో రాయండి.</TeluguHint></label>
                     </div>
-                    <label className="field"><span>Notes <small>Optional</small></span><textarea name="comment" rows={3} placeholder="Anything to note about this feeding?" /></label>
+                    <label className="field"><span>Notes <small>Optional</small></span><textarea name="comment" rows={3} placeholder="Anything to note about this feeding?" /><TeluguHint>మేత గురించి గుర్తుంచుకోవాల్సిన విషయం ఉంటే రాయండి.</TeluguHint></label>
                   </>
                 )}
                 {kind === 'growth' && (
                   <>
                     <div className="field-grid">
-                      <label className="field"><span>Average weight (g)</span><input name="average_weight_g" type="number" min="0.01" step="0.01" placeholder="12.5" required /></label>
-                      <label className="field"><span>Shrimp sampled</span><input name="sample_size" type="number" min="1" step="1" placeholder="30" required /></label>
+                      <label className="field"><span>Average weight (g)</span><input name="average_weight_g" type="number" min="0.01" step="0.01" placeholder="12.5" required /><TeluguHint>తూచిన రొయ్యల సగటు బరువు గ్రాముల్లో.</TeluguHint></label>
+                      <label className="field"><span>Shrimp sampled</span><input name="sample_size" type="number" min="1" step="1" placeholder="30" required /><TeluguHint>తూకం కోసం ఎన్ని రొయ్యలు తీసుకున్నారో.</TeluguHint></label>
                     </div>
-                    <label className="field"><span>Sampled on</span><input name="sampled_at" type="datetime-local" defaultValue={localDateTime()} required /></label>
-                    <label className="field"><span>Notes <small>Optional</small></span><textarea name="notes" rows={3} placeholder="Sample location, observations…" /></label>
+                    <label className="field"><span>Sampled on</span><input name="sampled_at" type="datetime-local" defaultValue={localDateTime()} required /><TeluguHint>రొయ్యల నమూనా తీసుకున్న తేదీ, సమయం.</TeluguHint></label>
+                    <label className="field"><span>Notes <small>Optional</small></span><textarea name="notes" rows={3} placeholder="Sample location, observations…" /><TeluguHint>నమూనా తీసుకున్న చోటు లేదా గమనించిన విషయాలు.</TeluguHint></label>
                   </>
                 )}
                 {kind === 'expenses' && (
                   <>
                     <div className="field-grid">
-                      <label className="field"><span>Category</span><select name="category" required defaultValue=""><option value="" disabled>Choose a category</option><option>Feed</option><option>Seed stock</option><option>Labor</option><option>Electricity</option><option>Equipment</option><option>Water treatment</option><option>Other</option></select></label>
-                      <label className="field"><span>Amount (₹)</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required /></label>
+                      <label className="field"><span>Category</span><select name="category" required defaultValue=""><option value="" disabled>Choose a category</option><option>Feed</option><option>Seed stock</option><option>Labor</option><option>Electricity</option><option>Equipment</option><option>Water treatment</option><option>Other</option></select><TeluguHint>ఖర్చు దేనికి చేశారో ఎంచుకోండి.</TeluguHint></label>
+                      <label className="field"><span>Amount (₹)</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required /><TeluguHint>ఖర్చు చేసిన మొత్తం రూపాయల్లో.</TeluguHint></label>
                     </div>
                     <div className="field-grid">
-                      <label className="field"><span>Date</span><input name="spent_at" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label>
-                      <label className="field"><span>Description</span><input name="description" placeholder="What was this expense for?" required /></label>
+                      <label className="field"><span>Date</span><input name="spent_at" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /><TeluguHint>ఖర్చు చేసిన తేదీ.</TeluguHint></label>
+                      <label className="field"><span>Description</span><input name="description" placeholder="What was this expense for?" required /><TeluguHint>ఈ ఖర్చు ఏ పనికి చేశారో కొద్దిగా వివరించండి.</TeluguHint></label>
                     </div>
                   </>
                 )}
                 {kind === 'water' && (
-                  <label className="field"><span>Notes <small>Optional</small></span><textarea name="comment" rows={3} placeholder="Observations from the pond…" /></label>
+                  <label className="field"><span>Notes <small>Optional</small></span><textarea name="comment" rows={3} placeholder="Observations from the pond…" /><TeluguHint>చెరువులో గమనించిన విషయాలు రాయండి.</TeluguHint></label>
                 )}
                 {error && <p className="form-message error-message" role="alert">{error}</p>}
                 {message && <p className="form-message success-message" role="status">{message}</p>}
@@ -365,21 +373,22 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
 function WaterFields({ dateTime }: { dateTime: string }) {
   return (
     <>
-      <label className="field"><span>Reading time</span><input name="logged_at" type="datetime-local" defaultValue={dateTime} required /></label>
+      <label className="field"><span>Reading time</span><input name="logged_at" type="datetime-local" defaultValue={dateTime} required /><TeluguHint>నీటి నమూనా తీసిన తేదీ, సమయం.</TeluguHint></label>
       <div className="water-field-grid">
         {[
-          ['temperature_c', 'Temperature', '°C', '28'],
-          ['pH', 'pH', 'scale', '7.8'],
-          ['do_mg_l', 'Dissolved oxygen', 'mg/L', '5.5'],
-          ['salinity_pps', 'Salinity', 'ppt', '15'],
-          ['ammonia_mg_l', 'Ammonia', 'mg/L', '0.02'],
-          ['nitrite_mg_l', 'Nitrite', 'mg/L', '0.1'],
-          ['alkalinity_ppms', 'Alkalinity', 'ppm', '120'],
-          ['transparency_lux', 'Transparency', 'cm', '35'],
-        ].map(([name, label, unit, placeholder]) => (
+          ['temperature_c', 'Temperature', '°C', '28', 'నీటి ఉష్ణోగ్రత డిగ్రీల సెల్సియస్‌లో.'],
+          ['pH', 'pH', 'scale', '7.8', 'నీరు ఆమ్లంగా ఉందా, క్షారంగా ఉందా తెలిపే కొలత.'],
+          ['do_mg_l', 'Dissolved oxygen', 'mg/L', '5.5', 'నీటిలో కరిగి ఉన్న ఆక్సిజన్ పరిమాణం.'],
+          ['salinity_pps', 'Salinity', 'ppt', '15', 'నీటిలో ఉప్పుదనం; మీ మీటర్ చూపిన విలువ నమోదు చేయండి.'],
+          ['ammonia_mg_l', 'Ammonia', 'mg/L', '0.02', 'నీటిలో అమ్మోనియా స్థాయి; పరీక్ష కిట్ రీడింగ్ రాయండి.'],
+          ['nitrite_mg_l', 'Nitrite', 'mg/L', '0.1', 'నీటిలో నైట్రైట్ స్థాయి; పరీక్ష కిట్ రీడింగ్ రాయండి.'],
+          ['alkalinity_ppms', 'Alkalinity', 'ppm', '120', 'నీటి క్షారత్వం; పరీక్ష కిట్ చూపిన ppm విలువ.'],
+          ['transparency_lux', 'Transparency', 'cm', '35', 'నీరు ఎంత స్పష్టంగా ఉందో సె.మీ.లో నమోదు చేయండి.'],
+        ].map(([name, label, unit, placeholder, hint]) => (
           <label className="field" key={name}>
             <span>{label} <small>{unit}</small></span>
             <input name={name} type="number" step="0.01" placeholder={placeholder} />
+            <TeluguHint>{hint}</TeluguHint>
           </label>
         ))}
       </div>

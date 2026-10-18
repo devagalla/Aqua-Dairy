@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TeluguHint } from '@/components/ui/telugu-hint'
 import { supabase } from '@/lib/supabase/client'
 
 type Farm = { id: string; name: string; region: string | null }
@@ -115,7 +116,7 @@ export default function PondsPage() {
   return (
     <div className="page-stack">
       <div className="page-heading animate-in">
-        <div><span className="eyebrow">YOUR FARM FOUNDATION</span><h1>Ponds &amp; cycles</h1><p>Add ponds and start culture cycles. Water, feed, and growth logs will use these records instead of making you type a cycle ID.</p></div>
+        <div><span className="eyebrow">YOUR FARM FOUNDATION</span><h1>Ponds &amp; cycles</h1><p>Add ponds and start culture cycles. Water, feed, and growth logs will use these records instead of making you type a cycle ID.</p><span className="telugu-subtitle" lang="te">చెరువులు, పెంపకం బ్యాచ్‌లు ఇక్కడ నమోదు చేయండి. నీరు, మేత, ఎదుగుదల వివరాలు తర్వాత సరైన బ్యాచ్‌కు జత అవుతాయి.</span></div>
         <span className="heading-orbit" aria-hidden="true">◉</span>
       </div>
       {error && <p className="form-message error-message" role="alert">{error}</p>}
@@ -133,9 +134,9 @@ export default function PondsPage() {
             <section className="card-surface record-form-card animate-in animate-delay">
               <div className="card-heading"><div><span className="eyebrow">GROWING SPACE</span><h2>Add a pond</h2></div><span className="insight-glyph">◌</span></div>
               <form className="record-form" onSubmit={addPond}>
-                <label className="field"><span>Farm</span><select value={farmId} onChange={(event) => setFarmId(event.target.value)} required>{farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}</select></label>
-                <label className="field"><span>Pond name</span><Input name="name" placeholder="e.g. Pond 02" required minLength={1} /></label>
-                <label className="field"><span>Area in acres <small>Optional</small></span><Input name="area_acres" type="number" min="0.01" step="0.01" placeholder="1.5" /></label>
+                <label className="field"><span>Farm</span><select value={farmId} onChange={(event) => setFarmId(event.target.value)} required>{farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}</select><TeluguHint>ఈ చెరువు ఏ ఫారానికి చెందుతుందో ఎంచుకోండి.</TeluguHint></label>
+                <label className="field"><span>Pond name</span><Input name="name" placeholder="e.g. Pond 02" required minLength={1} /><TeluguHint>గుర్తుపట్టేందుకు చెరువుకు పేరు లేదా నంబర్ పెట్టండి.</TeluguHint></label>
+                <label className="field"><span>Area in acres <small>Optional</small></span><Input name="area_acres" type="number" min="0.01" step="0.01" placeholder="1.5" /><TeluguHint>చెరువు విస్తీర్ణం ఎకరాల్లో రాయండి.</TeluguHint></label>
                 <Button type="submit" className="button-primary submit-button" disabled={saving}>Add pond <span aria-hidden="true">→</span></Button>
               </form>
             </section>
@@ -143,14 +144,14 @@ export default function PondsPage() {
               <div className="card-heading"><div><span className="eyebrow">A NEW GROWING SEASON</span><h2>Start a cycle</h2></div><span className="insight-glyph warm">↗</span></div>
               {ponds.length === 0 ? <p className="quiet-state">Add a pond first, then start its first culture cycle.</p> : (
                 <form className="record-form" onSubmit={addCycle}>
-                  <label className="field"><span>Pond</span><select value={pondId} onChange={(event) => setPondId(event.target.value)} required>{ponds.map((pond) => <option key={pond.id} value={pond.id}>{pond.name} · {pond.farm?.name}</option>)}</select></label>
+                  <label className="field"><span>Pond</span><select value={pondId} onChange={(event) => setPondId(event.target.value)} required>{ponds.map((pond) => <option key={pond.id} value={pond.id}>{pond.name} · {pond.farm?.name}</option>)}</select><TeluguHint>ఈ పెంపకం బ్యాచ్ ఏ చెరువులో ఉందో ఎంచుకోండి.</TeluguHint></label>
                   <div className="field-grid">
-                    <label className="field"><span>Seed stock</span><Input name="seed_stocked" type="number" min="1" step="1" placeholder="50000" required /></label>
-                    <label className="field"><span>Stocking date</span><Input name="stocking_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /></label>
+                    <label className="field"><span>Seed stock</span><Input name="seed_stocked" type="number" min="1" step="1" placeholder="50000" required /><TeluguHint>చెరువులో వదిలిన పిల్ల రొయ్యల మొత్తం సంఖ్య.</TeluguHint></label>
+                    <label className="field"><span>Stocking date</span><Input name="stocking_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /><TeluguHint>పిల్ల రొయ్యలను చెరువులో వదిలిన తేదీ.</TeluguHint></label>
                   </div>
                   <div className="field-grid">
-                    <label className="field"><span>PL stage <small>Optional</small></span><Input name="pl" placeholder="PL12" /></label>
-                    <label className="field"><span>Target days <small>Optional</small></span><Input name="target_harvest_days" type="number" min="1" placeholder="120" /></label>
+                    <label className="field"><span>PL stage <small>Optional</small></span><Input name="pl" placeholder="PL12" /><TeluguHint>PL అంటే పోస్ట్‌ లార్వా దశ. హ్యాచరీ పిల్ల రొయ్యల దశ సంఖ్య; ఉదా: PL12.</TeluguHint></label>
+                    <label className="field"><span>Target days <small>Optional</small></span><Input name="target_harvest_days" type="number" min="1" placeholder="120" /><TeluguHint>పిల్ల రొయ్యలను వదిలిన రోజు నుంచి కోతకు లక్ష్యంగా పెట్టుకున్న రోజులు.</TeluguHint></label>
                   </div>
                   <Button type="submit" className="button-primary submit-button" disabled={saving}>Start this cycle <span aria-hidden="true">→</span></Button>
                 </form>

@@ -66,6 +66,7 @@ export default function SignUp() {
             <span className="eyebrow">YOU ALREADY HAVE A PLACE HERE</span>
             <h1>Try signing in instead.</h1>
             <p>We couldn&apos;t confirm that a new account was created for <strong>{email}</strong>. If you already have an account, sign in to continue. If it still needs email verification, you can request another confirmation link below.</p>
+            <span className="telugu-subtitle" lang="te">ఈమెయిల్ నిర్ధారణ కావాలంటే కింద ఉన్న బటన్‌తో కొత్త లింక్ పంపించండి. ఇప్పటికే ఖాతా ఉంటే సైన్ ఇన్ అవ్వండి.</span>
             <Link className="button-primary auth-continue-button" href="/auth/signin">Go to sign in <span aria-hidden="true">→</span></Link>
             {resent ? (
               <p className="success-message form-message" role="status">
@@ -85,6 +86,7 @@ export default function SignUp() {
             <span className="eyebrow">ONE LAST STEP</span>
             <h1>Check your inbox.</h1>
             <p>If this is a new account, check <strong>{email}</strong> for a verification link. Open it to confirm your email and continue to farm setup. Also check spam or promotions; email delivery depends on your Supabase Auth email configuration.</p>
+            <span className="telugu-subtitle" lang="te">ఈమెయిల్‌లో వచ్చిన “Confirm your email” లింక్‌ను తెరిచి చిరునామా నిర్ధారించండి. మెయిల్ కనిపించకపోతే Spam లేదా Promotions ఫోల్డర్ కూడా చూడండి.</span>
             <div className="verify-steps">
               <span><b>01</b> Open the email from Aqua Dairy</span>
               <span><b>02</b> Tap “Confirm your email”</span>
@@ -99,9 +101,10 @@ export default function SignUp() {
             <span className="eyebrow">GROW WITH CLARITY</span>
             <h1>Your farm&apos;s next chapter.</h1>
             <p className="auth-intro">Create an account to bring your pond notes, cycles, and daily decisions together.</p>
+            <span className="telugu-subtitle" lang="te">చెరువు వివరాలు, పెంపకం బ్యాచ్‌లు, రోజువారీ లెక్కలు ఒకచోట భద్రపరచడానికి ఖాతా తెరవండి.</span>
             <form className="auth-form" onSubmit={submit}>
-              <label className="field"><span>Email address</span><Input type="email" autoComplete="email" placeholder="you@yourfarm.com" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-              <label className="field"><span>Create a password</span><Input type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><small>Use at least 8 characters.</small></label>
+              <label className="field"><span>Email address</span><Input type="email" autoComplete="email" placeholder="you@yourfarm.com" value={email} onChange={(event) => setEmail(event.target.value)} required /><span className="telugu-hint" lang="te">మీరు వాడే ఈమెయిల్ చిరునామా నమోదు చేయండి.</span></label>
+              <label className="field"><span>Create a password</span><Input type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><small>Use at least 8 characters.</small><span className="telugu-hint" lang="te">కనీసం 8 అక్షరాలు లేదా అంకెలతో పాస్‌వర్డ్ పెట్టండి.</span></label>
               {error && <p className="form-message error-message" role="alert">{error}</p>}
               <Button type="submit" className="button-primary submit-button" disabled={busy}>{busy ? 'Creating your account…' : 'Create my account'} <span aria-hidden="true">→</span></Button>
             </form>
