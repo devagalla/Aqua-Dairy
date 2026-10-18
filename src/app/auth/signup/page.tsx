@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { TurnstileInstance } from '@marsidev/react-turnstile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TurnstileCaptcha } from '@/components/auth/turnstile-captcha'
 import { supabase } from '@/lib/supabase/client'
 
 export default function SignUp() {
@@ -14,9 +16,15 @@ export default function SignUp() {
   const [sent, setSent] = useState(false)
   const [resent, setResent] = useState(false)
   const [existingAccount, setExistingAccount] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaRef = useRef<TurnstileInstance>()
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!captchaToken) {
+      setError('Complete the security check before creating your account.')
+      return
+    }
     setBusy(true)
     setError('')
     const { data, error: signupError } = await supabase.auth.signUp({
@@ -24,8 +32,11 @@ export default function SignUp() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        captchaToken,
       },
     })
+    captchaRef.current?.reset()
+    setCaptchaToken('')
     setBusy(false)
     if (signupError) {
       setError(signupError.message)
@@ -43,13 +54,22 @@ export default function SignUp() {
   }
 
   async function resendEmail() {
+    if (!captchaToken) {
+      setError('Complete the security check before requesting another email.')
+      return
+    }
     setBusy(true)
     setError('')
     const { error: resendError } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        captchaToken,
+      },
     })
+    captchaRef.current?.reset()
+    setCaptchaToken('')
     setBusy(false)
     if (resendError) setError(resendError.message)
     else setResent(true)
@@ -73,9 +93,12 @@ export default function SignUp() {
                 Verification request accepted. If this account still needs confirmation, check your inbox and spam folder. Delivery depends on your email provider settings.
               </p>
             ) : (
-              <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy}>
+              <>
+                <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
+                <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy || !captchaToken}>
                 {busy ? 'Requesting a link…' : 'Need to verify? Request a new link'}
-              </button>
+                </button>
+              </>
             )}
             {error && <p className="form-message error-message" role="alert">{error}</p>}
             <p className="auth-switch">Need a different account? <button className="quiet-link" type="button" onClick={() => { setExistingAccount(false); setError('') }}>Back to sign up</button></p>
@@ -92,7 +115,12 @@ export default function SignUp() {
               <span><b>02</b> Tap “Confirm your email”</span>
               <span><b>03</b> Add your farm, pond, and first cycle</span>
             </div>
-            {resent ? <p className="success-message form-message" role="status">Verification request accepted. If this account still needs confirmation, check your inbox and spam folder. Delivery depends on your email provider settings.</p> : <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy}>Didn&apos;t get the email? Request another link</button>}
+            {resent ? <p className="success-message form-message" role="status">Verification request accepted. If this account still needs confirmation, check your inbox and spam folder. Delivery depends on your email provider settings.</p> : (
+              <>
+                <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
+                <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy || !captchaToken}>Didn&apos;t get the email? Request another link</button>
+              </>
+            )}
             {error && <p className="form-message error-message" role="alert">{error}</p>}
             <p className="auth-switch">Already confirmed? <Link href="/auth/signin">Sign in</Link></p>
           </div>
@@ -105,8 +133,9 @@ export default function SignUp() {
             <form className="auth-form" onSubmit={submit}>
               <label className="field"><span>Email address</span><Input type="email" autoComplete="email" placeholder="you@yourfarm.com" value={email} onChange={(event) => setEmail(event.target.value)} required /><span className="telugu-hint" lang="te">మీరు వాడే ఈమెయిల్ చిరునామా నమోదు చేయండి.</span></label>
               <label className="field"><span>Create a password</span><Input type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><small>Use at least 8 characters.</small><span className="telugu-hint" lang="te">కనీసం 8 అక్షరాలు లేదా అంకెలతో పాస్‌వర్డ్ పెట్టండి.</span></label>
+              <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
               {error && <p className="form-message error-message" role="alert">{error}</p>}
-              <Button type="submit" className="button-primary submit-button" disabled={busy}>{busy ? 'Creating your account…' : 'Create my account'} <span aria-hidden="true">→</span></Button>
+              <Button type="submit" className="button-primary submit-button" disabled={busy || !captchaToken}>{busy ? 'Creating your account…' : 'Create my account'} <span aria-hidden="true">→</span></Button>
             </form>
             <p className="auth-switch">Already have an account? <Link href="/auth/signin">Sign in</Link></p>
           </>

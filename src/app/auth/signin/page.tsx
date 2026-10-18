@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { TurnstileInstance } from '@marsidev/react-turnstile'
+import { TurnstileCaptcha } from '@/components/auth/turnstile-captcha'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase/client'
@@ -15,6 +17,8 @@ export default function SignIn() {
   const [needsVerification, setNeedsVerification] = useState(false)
   const [resendNotice, setResendNotice] = useState('')
   const [resending, setResending] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaRef = useRef<TurnstileInstance>()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -27,12 +31,22 @@ export default function SignIn() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!captchaToken) {
+      setError('Complete the security check before signing in.')
+      return
+    }
     setBusy(true)
     setError('')
     setNotice('')
     setNeedsVerification(false)
     setResendNotice('')
-    const { error: signinError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signinError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken },
+    })
+    captchaRef.current?.reset()
+    setCaptchaToken('')
     if (signinError) {
       setError(signinError.message)
       setNeedsVerification(
@@ -59,6 +73,10 @@ export default function SignIn() {
   }
 
   async function resendVerification() {
+    if (!captchaToken) {
+      setError('Complete the security check before requesting another email.')
+      return
+    }
     setResending(true)
     setError('')
     setResendNotice('')
@@ -67,8 +85,11 @@ export default function SignIn() {
       email,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        captchaToken,
       },
     })
+    captchaRef.current?.reset()
+    setCaptchaToken('')
     setResending(false)
     if (resendError) setError(resendError.message)
     else {
@@ -91,19 +112,20 @@ export default function SignIn() {
         <form className="auth-form" onSubmit={submit}>
           <label className="field"><span>Email address</span><Input type="email" autoComplete="email" placeholder="you@yourfarm.com" value={email} onChange={(event) => setEmail(event.target.value)} required /><span className="telugu-hint" lang="te">ఖాతా తెరిచేటప్పుడు వాడిన ఈమెయిల్ నమోదు చేయండి.</span></label>
           <label className="field"><span>Password</span><Input type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={(event) => setPassword(event.target.value)} required /><span className="telugu-hint" lang="te">మీ ఖాతా పాస్‌వర్డ్ నమోదు చేయండి.</span></label>
+          <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
           {error && <p className="form-message error-message" role="alert">{error}</p>}
           {needsVerification && (
             <button
               className="quiet-link resend-signin-link"
               type="button"
               onClick={resendVerification}
-              disabled={resending || !email}
+              disabled={resending || !email || !captchaToken}
             >
               {resending ? 'Requesting a link…' : 'Resend verification email'}
             </button>
           )}
           {resendNotice && <p className="form-message success-message" role="status">{resendNotice}</p>}
-          <Button type="submit" className="button-primary submit-button" disabled={busy}>{busy ? 'Signing you in…' : 'Sign in to your farm'} <span aria-hidden="true">→</span></Button>
+          <Button type="submit" className="button-primary submit-button" disabled={busy || !captchaToken}>{busy ? 'Signing you in…' : 'Sign in to your farm'} <span aria-hidden="true">→</span></Button>
         </form>
         <p className="auth-switch">New to Aqua Dairy? <Link href="/auth/signup">Create an account</Link></p>
       </section>
