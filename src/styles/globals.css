@@ -345,6 +345,12 @@ textarea:focus-visible {
 .journal-copy strong { overflow: hidden; color: #48655a; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .journal-copy span { color: #97a49b; font-size: 8px; }
 .journal-value { color: #31776d; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.journal-details { flex: 0 0 100%; margin-left: 17px; color: #5f7c6d; font-size: 9px; }
+.journal-details summary { width: fit-content; color: #31776d; font-weight: 700; cursor: pointer; }
+.journal-details dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 9px 16px; margin: 10px 0 2px; border-left: 2px solid #dce9da; padding: 3px 0 3px 11px; }
+.journal-details dl > div { display: grid; gap: 3px; min-width: 0; }
+.journal-details dt { color: #8c9b91; font-size: 8px; }
+.journal-details dd { overflow-wrap: anywhere; margin: 0; color: #49685a; font-size: 10px; line-height: 1.5; }
 .journal-delete, .journal-load-more { min-height: 34px; border: 1px solid #ead8d2; border-radius: 5px; background: #fff8f5; padding: 0 11px; color: #a45343; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
 .journal-delete:hover:not(:disabled) { border-color: #d5a89b; background: #fff0eb; }
 .journal-delete:disabled { cursor: wait; opacity: .6; }

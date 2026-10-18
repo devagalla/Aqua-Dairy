@@ -206,6 +206,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         const result = await response.json()
         if (!response.ok) throw new Error(result.error ?? 'Could not save water log.')
         setMessage('Water log saved. Your pond readings are up to date.')
+        if (result.alert_warning) setError(result.alert_warning)
         formElement.reset()
         await loadRecords()
       } catch (caught) {
@@ -485,6 +486,17 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                         : new Date(String(record[page.dateColumn])).toLocaleString()}</span>
                     </div>
                     <span className="journal-value">{recentValue(kind, record)}</span>
+                    <details className="journal-details">
+                      <summary>Details</summary>
+                      <dl>
+                        {recordDetails(kind, record).map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
                     <button
                       type="button"
                       className="journal-delete"
@@ -562,4 +574,49 @@ function recentValue(kind: RecordKind, record: RecentRecord) {
   }
   if (kind === 'growth') return `${displayValue(record.average_weight_g)} g avg.`
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(record.amount))
+}
+
+function recordDetails(kind: RecordKind, record: RecentRecord): [string, string][] {
+  const fields: Record<RecordKind, [string, string, string?][]> = {
+    water: [
+      ['Temperature', 'temperature_c', '°C'],
+      ['pH', 'ph'],
+      ['Dissolved oxygen', 'do_mg_l', 'mg/L'],
+      ['Salinity', 'salinity_pps', 'ppt'],
+      ['Ammonia', 'ammonia_mg_l', 'mg/L'],
+      ['Nitrite', 'nitrite_mg_l', 'mg/L'],
+      ['Alkalinity', 'alkalinity_ppms', 'ppm'],
+      ['Transparency', 'transparency_lux', 'cm'],
+      ['Notes', 'comment'],
+    ],
+    feed: [
+      ['Feed type', 'feed_type'],
+      ['Entry type', 'entry_mode'],
+      ['Amount', 'amount_kg', 'kg'],
+      ['Number of feedings', 'feeding_count'],
+      ['Previous frequency note', 'feeding_frequency'],
+      ['Notes', 'comment'],
+    ],
+    growth: [
+      ['Average weight', 'average_weight_g', 'g'],
+      ['Shrimp sampled', 'sample_size'],
+      ['Notes', 'notes'],
+    ],
+    expenses: [
+      ['Category', 'category'],
+      ['Description', 'description'],
+      ['Amount', 'amount', 'INR'],
+    ],
+  }
+
+  return fields[kind].flatMap(([label, key, unit]) => {
+    const value = record[key]
+    if (value == null || value === '') return []
+    const formatted = key === 'entry_mode'
+      ? value === 'daily_summary' ? 'Whole-day summary' : 'One feeding'
+      : key === 'amount' && kind === 'expenses'
+        ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(value))
+        : `${value}${unit ? ` ${unit}` : ''}`
+    return [[label, formatted]]
+  })
 }

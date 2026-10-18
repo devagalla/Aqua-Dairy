@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
   }
 
   const alerts = await evaluateRules(result.data, supabase)
+  let alertWarning: string | null = null
   if (alerts.length > 0) {
     const { error: alertError } = await supabase.from('alert_log').insert(
       alerts.map((alert) => ({
@@ -63,12 +64,9 @@ export async function POST(req: NextRequest) {
     )
 
     if (alertError) {
-      return NextResponse.json(
-        { error: `Water log saved, but alert creation failed: ${alertError.message}` },
-        { status: 500 },
-      )
+      alertWarning = `Water reading saved, but its alert could not be created: ${alertError.message}`
     }
   }
 
-  return NextResponse.json(data, { status: 201 })
+  return NextResponse.json({ ...data, alert_warning: alertWarning }, { status: 201 })
 }
