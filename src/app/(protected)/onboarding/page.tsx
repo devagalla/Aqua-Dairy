@@ -37,7 +37,11 @@ export default function OnboardingPage() {
       router.replace('/dashboard')
       router.refresh()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not finish farm setup.')
+      const message = typeof caught === 'object' && caught !== null && 'message' in caught
+        && typeof caught.message === 'string'
+        ? caught.message
+        : 'Could not finish farm setup.'
+      setError(message)
     } finally {
       setSaving(false)
     }
