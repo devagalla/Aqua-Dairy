@@ -45,7 +45,7 @@ export default function Dashboard() {
       const [farms, ponds, cycles, water, growth, feed, expenses] = await Promise.all([
         supabase.from('farms').select('name').order('created_at').limit(1),
         supabase.from('ponds').select('id, name, locality, latitude, longitude, farms(name)').order('created_at'),
-        supabase.from('culture_cycles').select('id', { count: 'exact', head: true }),
+        supabase.from('culture_cycles').select('id', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('water_logs').select('ph, do_mg_l, logged_at').order('logged_at', { ascending: false }).limit(1),
         supabase.from('growth_samples').select('average_weight_g, sampled_at').order('sampled_at', { ascending: false }).limit(1),
         supabase.from('feed_logs').select('amount_kg'),
@@ -114,15 +114,15 @@ export default function Dashboard() {
 
       <section className="stats-grid" aria-label="Farm summary">
         <article className="stat-card animate-in animate-delay">
-          <span className="stat-label">Active ponds <span className="eyebrow-te" lang="te">నడుస్తున్న చెరువులు</span></span>
+          <span className="stat-label">Ponds <span className="eyebrow-te" lang="te">చెరువులు</span></span>
           <strong>{overview.loading ? '—' : overview.pondCount.toString().padStart(2, '0')}</strong>
-          <span className="stat-note">across your farm</span>
+          <span className="stat-note">in your farms</span>
           <span className="stat-sparkline aqua-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
         <article className="stat-card animate-in animate-delay-2">
-          <span className="stat-label">Culture cycles <span className="eyebrow-te" lang="te">పెంపకం బ్యాచ్‌లు</span></span>
+          <span className="stat-label">Active cycles <span className="eyebrow-te" lang="te">ప్రస్తుతం ఉన్న పెంపకం బ్యాచ్‌లు</span></span>
           <strong>{overview.loading ? '—' : overview.cycleCount.toString().padStart(2, '0')}</strong>
-          <span className="stat-note">growing right now</span>
+          <span className="stat-note">batches currently being raised</span>
           <span className="stat-sparkline green-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
         <article className="stat-card animate-in animate-delay-3">

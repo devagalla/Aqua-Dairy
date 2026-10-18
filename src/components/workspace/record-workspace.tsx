@@ -13,6 +13,7 @@ type CycleOption = {
   id: string
   pond_id: string
   stocking_date: string
+  status: 'active' | 'completed'
   pond?: { id?: string; name?: string; farm_id?: string; farm?: { name?: string } }
 }
 type RecentRecord = { id: string } & Record<string, string | number | null>
@@ -80,6 +81,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
   const [farmId, setFarmId] = useState('')
   const [cycleId, setCycleId] = useState('')
   const [expenseScope, setExpenseScope] = useState<'farm' | 'pond'>('farm')
+  const [feedEntryMode, setFeedEntryMode] = useState<'single' | 'daily_summary'>('single')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -113,7 +115,8 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         supabase.from('farms').select('id, name').order('created_at'),
         supabase
           .from('culture_cycles')
-          .select('id, pond_id, stocking_date, ponds(id, name, farm_id, farms(name))')
+          .select('id, pond_id, stocking_date, status, ponds(id, name, farm_id, farms(name))')
+          .eq('status', 'active')
           .order('stocking_date', { ascending: false }),
       ])
       if (cancelled) return
@@ -216,10 +219,13 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     if (kind === 'feed') {
       payload = {
         cycle_id: cycleId,
-        logged_at: timestamp('logged_at'),
+        logged_at: feedEntryMode === 'single'
+          ? timestamp('logged_at')
+          : new Date(`${get('summary_date')}T12:00:00`).toISOString(),
         feed_type: get('feed_type'),
         amount_kg: Number(get('amount_kg')),
-        feeding_frequency: get('feeding_frequency') || null,
+        entry_mode: feedEntryMode,
+        feeding_count: feedEntryMode === 'daily_summary' ? Number(get('feeding_count')) : 1,
         comment: get('comment') || null,
       }
     } else if (kind === 'growth') {
@@ -309,15 +315,19 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         </span>
       </div>
 
-      {!loading && !canRecord ? (
+      {!loading && !canRecord && (
         <section className="empty-state card-surface animate-in">
           <span className="empty-icon" aria-hidden="true">✳</span>
-          <h2>Your first pond is one small step away.</h2>
-          <p>Create your farm, pond, and culture cycle once. Then your records can be connected to the right shrimp.</p>
-          <Link className="button-primary" href="/onboarding">Set up my farm <span aria-hidden="true">→</span></Link>
+          <h2>{farms.length === 0 ? 'Your first pond is one small step away.' : 'No active culture cycle right now.'}</h2>
+          <p>{farms.length === 0
+            ? 'Create your farm, pond, and culture cycle once. Then your records can be connected to the right shrimp.'
+            : 'Complete the previous cycle and start a new batch from Ponds & cycles before adding current readings.'}</p>
+          <Link className="button-primary" href={farms.length === 0 ? '/onboarding' : '/ponds'}>
+            {farms.length === 0 ? 'Set up my farm' : 'Manage ponds & cycles'} <span aria-hidden="true">→</span>
+          </Link>
         </section>
-      ) : (
-        <>
+      )}
+      {canRecord && (
         <div className="record-layout">
           <section className="card-surface record-form-card animate-in">
             <div className="card-heading">
@@ -387,13 +397,29 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                 {kind === 'feed' && (
                   <>
                     <div className="field-grid">
+                      <label className="field">
+                        <span>Entry type</span>
+                        <select value={feedEntryMode} onChange={(event) => setFeedEntryMode(event.target.value === 'daily_summary' ? 'daily_summary' : 'single')}>
+                          <option value="single">One feeding</option>
+                          <option value="daily_summary">Whole-day summary</option>
+                        </select>
+                        <TeluguHint>ఒక్కసారి వేసిన మేతనా, ఆ రోజు మొత్తం లెక్కనా ఎంచుకోండి.</TeluguHint>
+                      </label>
                       <label className="field"><span>Feed type</span><input name="feed_type" placeholder="e.g. Grower pellet" required /><TeluguHint>ఇచ్చిన మేత పేరు లేదా రకం రాయండి.</TeluguHint></label>
-                      <label className="field"><span>Amount (kg)</span><input name="amount_kg" type="number" min="0.01" step="0.01" placeholder="25" required /><TeluguHint>ఈసారి ఇచ్చిన మేత కిలోలలో.</TeluguHint></label>
                     </div>
                     <div className="field-grid">
-                      <label className="field"><span>Date &amp; time</span><input name="logged_at" type="datetime-local" defaultValue={localDateTime()} required /><TeluguHint>మేత ఇచ్చిన తేదీ, సమయం.</TeluguHint></label>
-                      <label className="field"><span>Frequency</span><input name="feeding_frequency" placeholder="e.g. 3 times daily" /><TeluguHint>రోజుకు ఎన్నిసార్లు మేత వేస్తున్నారో రాయండి.</TeluguHint></label>
+                      <label className="field">
+                        <span>{feedEntryMode === 'single' ? 'Amount for this feeding (kg)' : 'Total feed for the day (kg)'}</span>
+                        <input name="amount_kg" type="number" min="0.01" step="0.01" placeholder="25" required />
+                        <TeluguHint>{feedEntryMode === 'single' ? 'ఈ ఒక్కసారి ఇచ్చిన మేత కిలోల్లో.' : 'ఆ రోజు మొత్తం ఇచ్చిన మేత కిలోల్లో.'}</TeluguHint>
+                      </label>
+                      {feedEntryMode === 'daily_summary' ? (
+                        <label className="field"><span>Feedings that day</span><input name="feeding_count" type="number" min="1" step="1" placeholder="4" required /><TeluguHint>ఆ రోజు నిజంగా ఎన్నిసార్లు మేత వేశారు?</TeluguHint></label>
+                      ) : (
+                        <label className="field"><span>Date &amp; time</span><input name="logged_at" type="datetime-local" defaultValue={localDateTime()} required /><TeluguHint>ఈసారి మేత వేసిన సమయం.</TeluguHint></label>
+                      )}
                     </div>
+                    {feedEntryMode === 'daily_summary' && <label className="field"><span>Date</span><input name="summary_date" type="date" defaultValue={localDateTime().slice(0, 10)} required /><TeluguHint>ఈ రోజు మొత్తం మేత లెక్క నమోదు చేస్తున్న తేదీ.</TeluguHint></label>}
                     <label className="field"><span>Notes <small>Optional</small></span><textarea name="comment" rows={3} placeholder="Anything to note about this feeding?" /><TeluguHint>మేత గురించి గుర్తుంచుకోవాల్సిన విషయం ఉంటే రాయండి.</TeluguHint></label>
                   </>
                 )}
@@ -430,6 +456,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
           </section>
 
         </div>
+      )}
         <section className="card-surface recent-card animate-in animate-delay">
             <div className="card-heading">
               <div>
@@ -453,7 +480,9 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                     <span className="journal-dot" />
                     <div className="journal-copy">
                       <strong>{recentTitle(kind, record)}</strong>
-                      <span>{new Date(String(record[page.dateColumn])).toLocaleString()}</span>
+                      <span>{kind === 'feed' && record.entry_mode === 'daily_summary'
+                        ? new Date(String(record[page.dateColumn])).toLocaleDateString()
+                        : new Date(String(record[page.dateColumn])).toLocaleString()}</span>
                     </div>
                     <span className="journal-value">{recentValue(kind, record)}</span>
                     <button
@@ -481,8 +510,6 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
             )}
             <div className="journal-footer"><span className="status-pulse" />Synced with your farm records</div>
         </section>
-        </>
-      )}
     </div>
   )
 }
@@ -515,14 +542,24 @@ function WaterFields({ dateTime }: { dateTime: string }) {
 
 function recentTitle(kind: RecordKind, record: RecentRecord) {
   if (kind === 'water') return 'Water quality check'
-  if (kind === 'feed') return displayValue(record.feed_type)
+  if (kind === 'feed') {
+    return `${displayValue(record.feed_type)}${record.entry_mode === 'daily_summary' ? ' · Daily summary' : ''}`
+  }
   if (kind === 'growth') return 'Growth sample'
   return displayValue(record.category)
 }
 
 function recentValue(kind: RecordKind, record: RecentRecord) {
   if (kind === 'water') return `pH ${displayValue(record.ph)}`
-  if (kind === 'feed') return `${displayValue(record.amount_kg)} kg`
+  if (kind === 'feed') {
+    const amount = `${displayValue(record.amount_kg)} kg`
+    const feedingCount = Number(record.feeding_count ?? 1)
+    if (record.entry_mode === 'daily_summary') return `${amount} total · ${feedingCount} feedings`
+    if (typeof record.feeding_frequency === 'string' && record.feeding_frequency.trim()) {
+      return `${amount} · previous frequency note: ${record.feeding_frequency}`
+    }
+    return `${amount} · one feeding`
+  }
   if (kind === 'growth') return `${displayValue(record.average_weight_g)} g avg.`
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(record.amount))
 }

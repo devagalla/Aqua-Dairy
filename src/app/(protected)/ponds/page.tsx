@@ -25,6 +25,8 @@ type Cycle = {
   stocking_date: string
   seed_stocked: number
   pl: string | null
+  status: 'active' | 'completed'
+  completed_at: string | null
   pond?: { name?: string }
 }
 
@@ -47,7 +49,7 @@ export default function PondsPage() {
     const [farmResult, pondResult, cycleResult] = await Promise.all([
       supabase.from('farms').select('id, name, region').order('created_at'),
       supabase.from('ponds').select('id, name, area_acres, farm_id, locality, latitude, longitude, farms(name)').order('created_at'),
-      supabase.from('culture_cycles').select('id, pond_id, stocking_date, seed_stocked, pl, ponds(name)').order('stocking_date', { ascending: false }),
+      supabase.from('culture_cycles').select('id, pond_id, stocking_date, seed_stocked, pl, status, completed_at, ponds(name)').order('stocking_date', { ascending: false }),
     ])
     const failed = [farmResult, pondResult, cycleResult].find((result) => result.error)
     if (failed?.error) setError(failed.error.message)
@@ -153,7 +155,7 @@ export default function PondsPage() {
     const values = new FormData(event.currentTarget)
     try {
       const { error: insertError } = await supabase.from('culture_cycles').insert({
-        pond_id: pondId,
+        pond_id: String(values.get('pond_id')),
         seed_stocked: Number(values.get('seed_stocked')),
         stocking_date: String(values.get('stocking_date')),
         pl: String(values.get('pl')).trim() || null,
@@ -169,6 +171,29 @@ export default function PondsPage() {
       setSaving(false)
     }
   }
+
+  async function completeCycle(cycleId: string) {
+    if (!window.confirm('Mark this culture cycle as completed? New logs will use the next cycle you start.')) return
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      const { error: completeError } = await supabase.rpc('complete_culture_cycle', {
+        target_cycle_id: cycleId,
+      })
+      if (completeError) throw completeError
+      setSuccess('Cycle marked completed. You can now start the next batch in this pond.')
+      await load()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not complete this culture cycle.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const pondsReadyForCycle = ponds.filter(
+    (pond) => !cycles.some((cycle) => cycle.pond_id === pond.id && cycle.status === 'active'),
+  )
 
   return (
     <div className="page-stack">
@@ -234,9 +259,11 @@ export default function PondsPage() {
             <section className="card-surface record-form-card animate-in animate-delay-2">
               <div className="card-heading"><div><span className="eyebrow">RESTOCK OR BEGIN AGAIN</span><h2>Start another cycle</h2></div><span className="insight-glyph warm">↗</span></div>
               <p className="quiet-state">Use this when a pond already exists and you are starting a new batch in it.</p>
-              {ponds.length === 0 ? <p className="quiet-state">Add a pond first, then start its first culture cycle.</p> : (
+              {ponds.length === 0 ? <p className="quiet-state">Add a pond first, then start its first culture cycle.</p> : pondsReadyForCycle.length === 0 ? (
+                <p className="quiet-state">Every pond already has an active cycle. Mark a cycle completed below before starting its next batch.</p>
+              ) : (
                 <form className="record-form" onSubmit={addCycle}>
-                  <label className="field"><span>Pond</span><select value={pondId} onChange={(event) => setPondId(event.target.value)} required>{ponds.map((pond) => <option key={pond.id} value={pond.id}>{pond.name} · {pond.farm?.name}</option>)}</select><TeluguHint>ఈ పెంపకం బ్యాచ్ ఏ చెరువులో ఉందో ఎంచుకోండి.</TeluguHint></label>
+                  <label className="field"><span>Pond</span><select name="pond_id" value={pondsReadyForCycle.some((pond) => pond.id === pondId) ? pondId : pondsReadyForCycle[0].id} onChange={(event) => setPondId(event.target.value)} required>{pondsReadyForCycle.map((pond) => <option key={pond.id} value={pond.id}>{pond.name} · {pond.farm?.name}</option>)}</select><TeluguHint>మునుపటి బ్యాచ్ పూర్తయిన చెరువును ఎంచుకోండి.</TeluguHint></label>
                   <div className="field-grid">
                     <label className="field"><span>Seed stock</span><Input name="seed_stocked" type="number" min="1" step="1" placeholder="50000" required /><TeluguHint>చెరువులో వదిలిన పిల్ల రొయ్యల మొత్తం సంఖ్య.</TeluguHint></label>
                     <label className="field"><span>Stocking date</span><Input name="stocking_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /><TeluguHint>పిల్ల రొయ్యలను చెరువులో వదిలిన తేదీ.</TeluguHint></label>
@@ -251,7 +278,7 @@ export default function PondsPage() {
             </section>
           </div>
           <section className="card-surface pond-overview-card">
-            <div className="card-heading"><div><span className="eyebrow">YOUR OPERATION</span><h2>Ponds and active cycles</h2></div><span className="record-count">{ponds.length} <small>ponds</small></span></div>
+            <div className="card-heading"><div><span className="eyebrow">YOUR OPERATION</span><h2>Ponds and culture cycles</h2></div><span className="record-count">{ponds.length} <small>ponds</small></span></div>
             {ponds.length === 0 ? <p className="quiet-state">No ponds added yet.</p> : (
               <div className="pond-list">
                 {ponds.map((pond) => {
@@ -259,7 +286,12 @@ export default function PondsPage() {
                   return <article className="pond-list-item" key={pond.id}>
                     <span className="pond-list-icon">◌</span>
                     <div><strong>{pond.name}</strong><span>{pond.farm?.name}{pond.area_acres ? ` · ${pond.area_acres} acres` : ''}{pond.locality ? ` · ${pond.locality}` : ''}</span></div>
-                    <div className="pond-cycle-list">{pondCycles.length ? pondCycles.map((cycle) => <span key={cycle.id} className="cycle-chip">PL {cycle.pl ?? '—'} · {cycle.seed_stocked.toLocaleString()} stocked · {cycle.stocking_date}</span>) : <span className="quiet-state">No cycle yet</span>}</div>
+                    <div className="pond-cycle-list">{pondCycles.length ? pondCycles.map((cycle) => (
+                      <div key={cycle.id} className="cycle-chip">
+                        <span>{cycle.status === 'active' ? 'Active' : 'Completed'} · PL {cycle.pl ?? '—'} · {cycle.seed_stocked.toLocaleString()} stocked · {cycle.stocking_date}{cycle.completed_at ? ` · ended ${cycle.completed_at}` : ''}</span>
+                        {cycle.status === 'active' && <Button type="button" className="farm-add-toggle" disabled={saving} onClick={() => void completeCycle(cycle.id)}>Mark completed</Button>}
+                      </div>
+                    )) : <span className="quiet-state">No cycle yet</span>}</div>
                     <div className="pond-location-edit">
                       <PondLocationPicker
                         key={`${pond.id}-${pond.latitude}-${pond.longitude}-${pond.locality}`}
