@@ -96,7 +96,7 @@ export default function SignUp() {
               <>
                 <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
                 <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy || !captchaToken}>
-                {busy ? 'Requesting a link…' : 'Need to verify? Request a new link'}
+                  {busy ? 'Requesting a link…' : 'Need to verify? Request a new link'}
                 </button>
               </>
             )}

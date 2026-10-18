@@ -2,7 +2,7 @@
 
 import { Turnstile } from '@marsidev/react-turnstile'
 import type { TurnstileInstance } from '@marsidev/react-turnstile'
-import type { RefObject } from 'react'
+import { useState, type RefObject } from 'react'
 
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
 
@@ -13,6 +13,8 @@ export function TurnstileCaptcha({
   captchaRef: RefObject<TurnstileInstance | undefined>
   onToken: (token: string) => void
 }) {
+  const [widgetError, setWidgetError] = useState('')
+
   if (!siteKey) {
     return (
       <p className="form-message error-message" role="alert">
@@ -26,10 +28,26 @@ export function TurnstileCaptcha({
       <Turnstile
         ref={captchaRef}
         siteKey={siteKey}
-        onSuccess={onToken}
-        onExpire={() => onToken('')}
-        onError={() => onToken('')}
+        onSuccess={(token) => {
+          setWidgetError('')
+          onToken(token)
+        }}
+        onExpire={() => {
+          setWidgetError('The security check expired. Complete it again to continue.')
+          onToken('')
+        }}
+        onError={() => {
+          setWidgetError('The security check could not load. Check the Turnstile hostname allowlist and confirm Supabase has the secret from this same widget.')
+          onToken('')
+        }}
+        scriptOptions={{
+          onError: () => {
+            setWidgetError('Could not load Cloudflare Turnstile. Check your connection and try again.')
+            onToken('')
+          },
+        }}
       />
+      {widgetError && <span className="form-message error-message" role="alert">{widgetError}</span>}
       <span className="telugu-hint" lang="te">దయచేసి భద్రతా తనిఖీ పూర్తి చేయండి.</span>
     </div>
   )
