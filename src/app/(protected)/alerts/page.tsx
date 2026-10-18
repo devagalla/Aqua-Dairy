@@ -23,7 +23,6 @@ export default function AlertsPage() {
     async function load() {
       const { data, error: queryError } = await supabase
         .from('alert_log')
-        .stream('alert_log')
         .select('id, severity, message, action, created_at, water_log_id')
         .order('created_at', { ascending: false })
         .limit(30)

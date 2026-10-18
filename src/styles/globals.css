@@ -353,6 +353,10 @@ textarea:focus-visible {
 .stat-label, .stat-note { display: block; color: #84978b; font-size: 9px; }
 .stat-card strong { display: block; margin: 12px 0 5px; color: #244c42; font-family: Georgia, serif; font-size: 27px; font-weight: 500; }
 .stat-note { font-size: 8px; }
+.finance-dashboard { display: grid; gap: 14px; }
+.finance-dashboard .card-heading { margin-bottom: 0; }
+.finance-dashboard .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.finance-disclaimer { margin: 0; color: #84978b; font-size: 9px; line-height: 1.6; }
 .stat-sparkline { position: absolute; right: 12px; bottom: 9px; font-size: 26px; letter-spacing: -8px; opacity: .37; transform: rotate(-15deg); }
 .aqua-spark { color: #4f9b9a; }
 .green-spark { color: #76a96f; }
@@ -518,6 +522,7 @@ textarea:focus-visible {
   .fish-two, .pond-leaf, .water-label { display: none; }
   .hero-action { margin-top: 16px; }
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .finance-dashboard .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat-card { min-height: 109px; padding: 13px; }
   .stat-card strong { font-size: 24px; }
   .section-heading { align-items: start; }

@@ -17,6 +17,12 @@ type CycleOption = {
   pond?: { id?: string; name?: string; farm_id?: string; farm?: { name?: string } }
 }
 type RecentRecord = { id: string } & Record<string, string | number | null>
+type FinanceSummary = {
+  total_income: number
+  total_expenses: number
+  net_profit: number
+  funding_received: number
+}
 const HISTORY_PAGE_SIZE = 10
 
 const config: Record<
@@ -51,10 +57,10 @@ const config: Record<
     cta: 'Save sample',
   },
   expenses: {
-    title: 'Farm expenses',
+    title: 'Farm finances',
     eyebrow: 'FARM FINANCES',
-    description: 'Keep farm costs together and see where your operating budget is going.',
-    teluguDescription: 'ఫారం ఖర్చులు తేదీ, రకం, మొత్తంతో ఇక్కడ నమోదు చేయండి.',
+    description: 'Track money spent and received, and see your recorded farm earnings at a glance.',
+    teluguDescription: 'ఫారం ఖర్చులు, వచ్చిన ఆదాయం, రుణాలు నమోదు చేసి మొత్తం లెక్కను చూడండి.',
     table: 'expenses',
     dateColumn: 'spent_at',
     cta: 'Save expense',
@@ -72,6 +78,14 @@ function displayValue(value: string | number | null | undefined) {
   return String(value)
 }
 
+function formatRupees(value: number) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
 export function RecordWorkspace({ kind }: { kind: RecordKind }) {
   const page = config[kind]
   const [farms, setFarms] = useState<FarmOption[]>([])
@@ -81,7 +95,9 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
   const [farmId, setFarmId] = useState('')
   const [cycleId, setCycleId] = useState('')
   const [expenseScope, setExpenseScope] = useState<'farm' | 'pond'>('farm')
+  const [transactionType, setTransactionType] = useState<'expense' | 'income'>('expense')
   const [feedEntryMode, setFeedEntryMode] = useState<'single' | 'daily_summary'>('single')
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -106,6 +122,22 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     setRecords((current) => from > 0 ? [...current, ...visibleRows] : visibleRows)
     return true
   }, [page.dateColumn, page.table])
+
+  const loadFinanceSummary = useCallback(async () => {
+    const { data, error: summaryError } = await supabase.rpc('get_expense_dashboard')
+    if (summaryError) {
+      setError(`Could not load farm finance totals: ${summaryError.message}`)
+      return false
+    }
+    const row = (data as FinanceSummary[] | null)?.[0]
+    setFinanceSummary(row ?? {
+      total_income: 0,
+      total_expenses: 0,
+      net_profit: 0,
+      funding_received: 0,
+    })
+    return true
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -153,13 +185,14 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
       setFarmId((current) => current || farmRows[0]?.id || '')
       setCycleId((current) => current || cycleRows[0]?.id || '')
       await loadRecords()
+      if (kind === 'expenses') await loadFinanceSummary()
       if (!cancelled) setLoading(false)
     }
     void loadOptions()
     return () => {
       cancelled = true
     }
-  }, [loadRecords])
+  }, [kind, loadFinanceSummary, loadRecords])
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -175,7 +208,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     }
     const recordFarmId = expenseScope === 'pond' ? selectedCycle?.pond?.farm_id ?? '' : farmId
     if (kind === 'expenses' && !recordFarmId) {
-      setError('Choose a farm or pond for this expense.')
+      setError(`Choose a farm or pond for this ${transactionType === 'income' ? 'income' : 'expense'} record.`)
       setSaving(false)
       return
     }
@@ -242,6 +275,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         farm_id: recordFarmId,
         cycle_id: expenseScope === 'pond' ? cycleId : null,
         spent_at: get('spent_at'),
+        transaction_type: transactionType,
         category: get('category'),
         description: get('description'),
         amount: Number(get('amount')),
@@ -257,10 +291,13 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
           ? 'Feeding saved. Nice work keeping your cycle on track.'
           : kind === 'growth'
             ? 'Growth sample saved. Your cycle progress is updated.'
-            : 'Expense saved to your farm records.',
+            : transactionType === 'income'
+              ? 'Money received saved to your farm records.'
+              : 'Expense saved to your farm records.',
       )
       formElement.reset()
       await loadRecords()
+      if (kind === 'expenses') await loadFinanceSummary()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save this record.')
     } finally {
@@ -281,6 +318,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
       if (deleteError) throw deleteError
       setMessage('Entry deleted.')
       await loadRecords()
+      if (kind === 'expenses') await loadFinanceSummary()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not delete this entry.')
     } finally {
@@ -316,6 +354,44 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         </span>
       </div>
 
+      {kind === 'expenses' && (
+        <section className="finance-dashboard card-surface" aria-label="Farm finance summary">
+          <div className="card-heading">
+            <div>
+              <span className="eyebrow">RECORDED TOTALS</span>
+              <h2>Income, costs &amp; earnings</h2>
+            </div>
+          </div>
+          {financeSummary ? (
+            <div className="stats-grid">
+              <article className="stat-card">
+                <span className="stat-label">Farm income</span>
+                <strong>{formatRupees(financeSummary.total_income)}</strong>
+                <span className="stat-note">Sales &amp; other farm income</span>
+              </article>
+              <article className="stat-card">
+                <span className="stat-label">Expenses</span>
+                <strong>{formatRupees(financeSummary.total_expenses)}</strong>
+                <span className="stat-note">Recorded farm costs</span>
+              </article>
+              <article className="stat-card">
+                <span className="stat-label">Net farm earnings</span>
+                <strong>{formatRupees(financeSummary.net_profit)}</strong>
+                <span className="stat-note">Income minus expenses</span>
+              </article>
+              <article className="stat-card">
+                <span className="stat-label">Loans &amp; contributions</span>
+                <strong>{formatRupees(financeSummary.funding_received)}</strong>
+                <span className="stat-note">Tracked separately from earnings</span>
+              </article>
+            </div>
+          ) : (
+            <p className="quiet-state">{loading ? 'Loading your finance totals…' : 'Finance totals are unavailable.'}</p>
+          )}
+          <p className="finance-disclaimer">Totals include records entered in Aqua Dairy. Net farm earnings are recorded sales and other farm income minus recorded expenses; loans and owner contributions are not counted as earnings.</p>
+        </section>
+      )}
+
       {!loading && !canRecord && (
         <section className="empty-state card-surface animate-in">
           <span className="empty-icon" aria-hidden="true">✳</span>
@@ -345,12 +421,12 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                 {kind === 'expenses' ? (
                   <>
                     <label className="field">
-                      <span>Expense scope</span>
+                      <span>Record scope</span>
                       <select value={expenseScope} onChange={(event) => setExpenseScope(event.target.value === 'pond' ? 'pond' : 'farm')}>
-                        <option value="farm">Farm-wide expense</option>
+                        <option value="farm">Farm-wide record</option>
                         <option value="pond" disabled={ponds.length === 0}>Specific pond / cycle</option>
                       </select>
-                      <TeluguHint>మొత్తం ఫారం ఖర్చుగా లేదా ఒక చెరువు బ్యాచ్ ఖర్చుగా నమోదు చేయండి.</TeluguHint>
+                      <TeluguHint>మొత్తం ఫారానికి లేదా ఒక చెరువు బ్యాచ్‌కు ఈ లావాదేవీని జత చేయండి.</TeluguHint>
                     </label>
                     {expenseScope === 'farm' ? (
                       <label className="field">
@@ -358,7 +434,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                         <select required value={farmId} onChange={(event) => setFarmId(event.target.value)}>
                           {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}
                         </select>
-                        <TeluguHint>ఈ ఖర్చు ఏ ఫారానికి చెందుతుందో ఎంచుకోండి.</TeluguHint>
+                        <TeluguHint>ఈ లావాదేవీ ఏ ఫారానికి చెందుతుందో ఎంచుకోండి.</TeluguHint>
                       </label>
                     ) : (
                       <label className="field">
@@ -373,9 +449,17 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                             return <option key={pond.id} value={pond.id}>{pond.name} · {pond.farmName}{cycle ? ` · ${cycle.stocking_date}` : ''}</option>
                           })}
                         </select>
-                        <TeluguHint>ఈ ఖర్చు ఏ చెరువు పెంపకం బ్యాచ్‌కు చెందుతుందో ఎంచుకోండి.</TeluguHint>
+                        <TeluguHint>ఈ లావాదేవీ ఏ చెరువు పెంపకం బ్యాచ్‌కు చెందుతుందో ఎంచుకోండి.</TeluguHint>
                       </label>
                     )}
+                    <label className="field">
+                      <span>Money flow</span>
+                      <select value={transactionType} onChange={(event) => setTransactionType(event.target.value === 'income' ? 'income' : 'expense')}>
+                        <option value="expense">Money spent — expense</option>
+                        <option value="income">Money received</option>
+                      </select>
+                      <TeluguHint>ఖర్చు చేసిన డబ్బునా, మీకు వచ్చిన డబ్బునా ఎంచుకోండి.</TeluguHint>
+                    </label>
                   </>
                 ) : (
                   <label className="field">
@@ -437,12 +521,21 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                 {kind === 'expenses' && (
                   <>
                     <div className="field-grid">
-                      <label className="field"><span>Category</span><select name="category" required defaultValue=""><option value="" disabled>Choose a category</option><option>Feed</option><option>Seed stock</option><option>Labor</option><option>Electricity</option><option>Equipment</option><option>Water treatment</option><option>Other</option></select><TeluguHint>ఖర్చు దేనికి చేశారో ఎంచుకోండి.</TeluguHint></label>
-                      <label className="field"><span>Amount (₹)</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required /><TeluguHint>ఖర్చు చేసిన మొత్తం రూపాయల్లో.</TeluguHint></label>
+                      <label className="field">
+                        <span>Category</span>
+                        <select name="category" required defaultValue="">
+                          <option value="" disabled>Choose a category</option>
+                          {transactionType === 'income'
+                            ? <><option>Harvest sale</option><option>Other farm income</option><option>Loan received</option><option>Owner contribution</option></>
+                            : <><option>Feed</option><option>Seed stock</option><option>Labor</option><option>Electricity</option><option>Equipment</option><option>Water treatment</option><option>Other</option></>}
+                        </select>
+                        <TeluguHint>{transactionType === 'income' ? 'వచ్చిన డబ్బు అమ్మకం, ఇతర ఆదాయం, రుణం లేదా మీ పెట్టుబడో ఎంచుకోండి.' : 'ఖర్చు దేనికి చేశారో ఎంచుకోండి.'}</TeluguHint>
+                      </label>
+                      <label className="field"><span>Amount (₹)</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required /><TeluguHint>మొత్తం రూపాయల్లో నమోదు చేయండి.</TeluguHint></label>
                     </div>
                     <div className="field-grid">
-                      <label className="field"><span>Date</span><input name="spent_at" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /><TeluguHint>ఖర్చు చేసిన తేదీ.</TeluguHint></label>
-                      <label className="field"><span>Description</span><input name="description" placeholder="What was this expense for?" required /><TeluguHint>ఈ ఖర్చు ఏ పనికి చేశారో కొద్దిగా వివరించండి.</TeluguHint></label>
+                      <label className="field"><span>Date</span><input name="spent_at" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /><TeluguHint>{transactionType === 'income' ? 'డబ్బు అందుకున్న తేదీ.' : 'ఖర్చు చేసిన తేదీ.'}</TeluguHint></label>
+                      <label className="field"><span>Description</span><input name="description" placeholder={transactionType === 'income' ? 'Who paid or what was received?' : 'What was this expense for?'} required /><TeluguHint>{transactionType === 'income' ? 'ఎవరి నుంచి లేదా దేనికి సంబంధించిన డబ్బు వచ్చిందో రాయండి.' : 'ఈ ఖర్చు ఏ పనికి చేశారో కొద్దిగా వివరించండి.'}</TeluguHint></label>
                     </div>
                   </>
                 )}
@@ -450,7 +543,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                   <label className="field"><span>Notes <small>Optional</small></span><textarea name="comment" rows={3} placeholder="Observations from the pond…" /><TeluguHint>చెరువులో గమనించిన విషయాలు రాయండి.</TeluguHint></label>
                 )}
                 <Button type="submit" disabled={saving || loading} className="button-primary submit-button">
-                  {saving ? 'Saving your record…' : page.cta} <span aria-hidden="true">→</span>
+                  {saving ? 'Saving your record…' : kind === 'expenses' ? transactionType === 'income' ? 'Save money received' : 'Save expense' : page.cta} <span aria-hidden="true">→</span>
                 </Button>
               </form>
             )}
@@ -558,7 +651,7 @@ function recentTitle(kind: RecordKind, record: RecentRecord) {
     return `${displayValue(record.feed_type)}${record.entry_mode === 'daily_summary' ? ' · Daily summary' : ''}`
   }
   if (kind === 'growth') return 'Growth sample'
-  return displayValue(record.category)
+  return `${record.transaction_type === 'income' ? 'Money received' : 'Expense'} · ${displayValue(record.category)}`
 }
 
 function recentValue(kind: RecordKind, record: RecentRecord) {
@@ -573,7 +666,8 @@ function recentValue(kind: RecordKind, record: RecentRecord) {
     return `${amount} · one feeding`
   }
   if (kind === 'growth') return `${displayValue(record.average_weight_g)} g avg.`
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(record.amount))
+  const prefix = record.transaction_type === 'income' ? '+' : '−'
+  return `${prefix}${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(record.amount))}`
 }
 
 function recordDetails(kind: RecordKind, record: RecentRecord): [string, string][] {
@@ -603,6 +697,7 @@ function recordDetails(kind: RecordKind, record: RecentRecord): [string, string]
       ['Notes', 'notes'],
     ],
     expenses: [
+      ['Type', 'transaction_type'],
       ['Category', 'category'],
       ['Description', 'description'],
       ['Amount', 'amount', 'INR'],
@@ -614,6 +709,8 @@ function recordDetails(kind: RecordKind, record: RecentRecord): [string, string]
     if (value == null || value === '') return []
     const formatted = key === 'entry_mode'
       ? value === 'daily_summary' ? 'Whole-day summary' : 'One feeding'
+      : key === 'transaction_type'
+        ? value === 'income' ? 'Money received' : 'Expense'
       : key === 'amount' && kind === 'expenses'
         ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(value))
         : `${value}${unit ? ` ${unit}` : ''}`
