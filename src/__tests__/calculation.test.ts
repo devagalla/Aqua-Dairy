@@ -40,11 +40,37 @@ describe('Calculation Utilities', () => {
     it('should calculate FCR correctly', () => {
       expect(calculateFCR(100, 20)).toBe(5);
       expect(calculateFCR(50, 10)).toBe(5);
+      expect(calculateFCR(7.5, 1.5)).toBe(5);
     });
 
     it('should return 0 for zero or negative weight gain', () => {
       expect(calculateFCR(100, 0)).toBe(0);
       expect(calculateFCR(100, -5)).toBe(0);
+    });
+
+    it('should handle zero feed correctly', () => {
+      expect(calculateFCR(0, 10)).toBe(0);
+      expect(calculateFCR(0, 0.5)).toBe(0);
+    });
+
+    it('should handle very small numbers', () => {
+      expect(calculateFCR(0.001, 0.0005)).toBeCloseTo(2);
+      expect(calculateFCR(0.000001, 0.0000005)).toBeCloseTo(2);
+    });
+
+    it('should handle large numbers', () => {
+      expect(calculateFCR(1000000, 50000)).toBe(20);
+      expect(calculateFCR(999999999, 333333333)).toBeCloseTo(3);
+    });
+
+    it('should handle negative feed with positive gain', () => {
+      // Mathematically valid but may not be realistic in domain
+      expect(calculateFCR(-100, 20)).toBe(-5);
+      expect(calculateFCR(-50, 10)).toBe(-5);
+    });
+
+    it('should return 0 when both inputs are zero', () => {
+      expect(calculateFCR(0, 0)).toBe(0);
     });
   });
 
