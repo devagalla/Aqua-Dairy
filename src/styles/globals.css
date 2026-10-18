@@ -345,6 +345,11 @@ textarea:focus-visible {
 .journal-copy strong { overflow: hidden; color: #48655a; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .journal-copy span { color: #97a49b; font-size: 8px; }
 .journal-value { color: #31776d; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.journal-delete, .journal-load-more { min-height: 34px; border: 1px solid #ead8d2; border-radius: 5px; background: #fff8f5; padding: 0 11px; color: #a45343; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+.journal-delete:hover:not(:disabled) { border-color: #d5a89b; background: #fff0eb; }
+.journal-delete:disabled { cursor: wait; opacity: .6; }
+.journal-load-more { display: block; margin: 16px auto 0; border-color: #d8e7d8; background: #f4f8f1; color: #376f61; }
+.journal-load-more:hover:not(:disabled) { border-color: #9dc5a7; background: #edf5e9; }
 .journal-footer { display: flex; align-items: center; gap: 8px; margin-top: 20px; color: #93a198; font-size: 8px; }
 .journal-footer .status-pulse { width: 5px; height: 5px; }
 
@@ -422,9 +427,49 @@ textarea:focus-visible {
 .form-footnote { margin: -5px 0 0; color: #98a69d; font-size: 9px; text-align: center; }
 .farm-manage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px; }
 .farm-manage-grid .record-form-card { min-height: 325px; }
+.farm-add-toggle { min-height: 38px; border: 1px solid #d8e7d8; border-radius: 5px; background: #f4f8f1; padding: 0 13px; color: #376f61; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.farm-add-toggle:hover { border-color: #9dc5a7; background: #edf5e9; }
 .pond-overview-card { padding: 22px; }
 .pond-list { display: grid; margin-top: 14px; }
 .pond-list-item { display: grid; grid-template-columns: 37px minmax(120px, .7fr) 1.3fr; align-items: center; gap: 12px; border-bottom: 1px solid #edf0e8; padding: 15px 0; }
+.pond-location-edit { grid-column: 1 / -1; padding-left: 49px; }
+.pond-location-picker { position: relative; display: grid; gap: 9px; }
+.pond-location-picker .field { gap: 6px; }
+.pond-location-button { justify-self: start; min-height: 35px; border: 1px solid #d8e7d8; border-radius: 5px; background: #f4f8f1; padding: 0 11px; color: #376f61; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+.pond-location-button:hover:not(:disabled) { border-color: #9dc5a7; background: #edf5e9; }
+.pond-location-button:disabled { cursor: wait; opacity: .65; }
+.pond-location-clear { justify-self: start; border: 0; background: transparent; padding: 0; color: #a45343; font: inherit; font-size: 10px; text-decoration: underline; cursor: pointer; }
+.location-suggestions { position: absolute; z-index: 5; top: 65px; right: 0; left: 0; max-height: 225px; overflow: auto; margin: 0; border: 1px solid #dfe8dc; border-radius: 6px; background: white; padding: 4px; box-shadow: 0 10px 25px rgba(35,76,53,.12); list-style: none; }
+.location-suggestions button { display: grid; width: 100%; gap: 4px; border: 0; border-radius: 4px; background: transparent; padding: 9px; color: #45675a; text-align: left; cursor: pointer; }
+.location-suggestions button:hover { background: #f1f6ee; }
+.location-suggestions strong { font-size: 11px; font-weight: 700; }
+.location-suggestions span, .location-attribution { color: #829289; font-size: 9px; }
+.location-attribution, .location-error, .location-notice { margin: 0; line-height: 1.5; }
+.location-error { color: #a54e3d; font-size: 10px; }
+.location-notice { color: #437c59; font-size: 10px; }
+.pond-weather-section { display: grid; gap: 14px; }
+.pond-weather-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+.pond-weather-card { min-width: 0; padding: 18px; }
+.weather-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.weather-card-heading > div { display: grid; gap: 4px; }
+.weather-card-heading strong { color: #365e50; font-size: 13px; }
+.weather-card-heading span { color: #829289; font-size: 10px; }
+.weather-card-heading > span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; background: #f7efda; color: #bd9550; font-size: 19px; }
+.weather-current { display: flex; align-items: center; gap: 12px; margin: 16px 0 12px; }
+.weather-current > strong { color: #244c42; font-family: Georgia, serif; font-size: 40px; font-weight: 500; letter-spacing: -.05em; }
+.weather-current > div { display: grid; gap: 3px; color: #537265; font-size: 12px; }
+.weather-current small { color: #91a096; font-size: 9px; }
+.weather-details { display: flex; flex-wrap: wrap; gap: 8px 14px; border-bottom: 1px solid #edf0e8; padding-bottom: 12px; color: #83938a; font-size: 9px; }
+.weather-details span { display: flex; gap: 4px; }
+.weather-details b { color: #526e61; font-weight: 700; }
+.weather-days { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+.weather-days > div { display: grid; min-width: 0; gap: 5px; border-radius: 5px; background: #f6f8f2; padding: 9px 7px; }
+.weather-days strong { color: #536e62; font-size: 10px; }
+.weather-days span, .weather-days small { overflow: hidden; color: #829289; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.weather-attribution { margin: 0; color: #91a096; font-size: 9px; }
+.weather-empty { display: grid; gap: 8px; margin-top: 14px; }
+.weather-empty p { margin: 0; color: #829289; font-size: 11px; line-height: 1.6; }
+.weather-empty a { color: #31776d; font-size: 10px; font-weight: 700; }
 .pond-list-item:last-child { border-bottom: 0; }
 .pond-list-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #e8f3ed; color: #4d9589; font-size: 20px; }
 .pond-list-item > div:nth-child(2) { display: grid; gap: 5px; }
@@ -504,9 +549,14 @@ textarea:focus-visible {
   .shortcut-card { min-height: 131px; padding: 13px; }
   .dashboard-bottom-grid { grid-template-columns: 1fr; }
   .record-layout { grid-template-columns: 1fr; }
+  .journal-row { flex-wrap: wrap; }
+  .journal-copy { flex-basis: calc(100% - 27px); }
+  .journal-value { margin-left: 17px; }
+  .journal-delete { margin-left: auto; }
   .farm-manage-grid { grid-template-columns: 1fr; }
   .pond-list-item { grid-template-columns: 34px 1fr; }
   .pond-cycle-list { grid-column: 2; }
+  .pond-location-edit { grid-column: 1 / -1; padding-left: 0; }
   .record-form-card, .recent-card { padding: 18px; }
   .page-heading h1 { font-size: 34px; }
   .heading-orbit { width: 45px; height: 45px; font-size: 19px; }

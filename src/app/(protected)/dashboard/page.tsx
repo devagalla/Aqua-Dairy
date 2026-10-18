@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { PondWeather, type WeatherPond } from '@/components/workspace/pond-weather'
 import { supabase } from '@/lib/supabase/client'
 
 type Overview = {
@@ -12,6 +13,7 @@ type Overview = {
   latestGrowth: { average_weight_g: number; sampled_at: string } | null
   totalFeed: number
   totalExpenses: number
+  weatherPonds: WeatherPond[]
   error: string
   loading: boolean
 }
@@ -32,6 +34,7 @@ export default function Dashboard() {
     latestGrowth: null,
     totalFeed: 0,
     totalExpenses: 0,
+    weatherPonds: [],
     error: '',
     loading: true,
   })
@@ -41,7 +44,7 @@ export default function Dashboard() {
     async function load() {
       const [farms, ponds, cycles, water, growth, feed, expenses] = await Promise.all([
         supabase.from('farms').select('name').order('created_at').limit(1),
-        supabase.from('ponds').select('id', { count: 'exact', head: true }),
+        supabase.from('ponds').select('id, name, locality, latitude, longitude, farms(name)').order('created_at'),
         supabase.from('culture_cycles').select('id', { count: 'exact', head: true }),
         supabase.from('water_logs').select('ph, do_mg_l, logged_at').order('logged_at', { ascending: false }).limit(1),
         supabase.from('growth_samples').select('average_weight_g, sampled_at').order('sampled_at', { ascending: false }).limit(1),
@@ -54,14 +57,26 @@ export default function Dashboard() {
         setOverview((value) => ({ ...value, error: failed.error.message, loading: false }))
         return
       }
+      const pondRows = (ponds.data ?? []).map((pond) => {
+        const farm = pond.farms as { name?: string } | null
+        return {
+          id: pond.id,
+          name: pond.name,
+          locality: pond.locality,
+          latitude: pond.latitude,
+          longitude: pond.longitude,
+          farmName: farm?.name ?? 'Farm',
+        }
+      }) as WeatherPond[]
       setOverview({
         farmName: farms.data?.[0]?.name ?? '',
-        pondCount: ponds.count ?? 0,
+        pondCount: pondRows.length,
         cycleCount: cycles.count ?? 0,
         latestWater: water.data?.[0] ?? null,
         latestGrowth: growth.data?.[0] ?? null,
         totalFeed: (feed.data ?? []).reduce((sum, row) => sum + Number(row.amount_kg), 0),
         totalExpenses: (expenses.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
+        weatherPonds: pondRows,
         error: '',
         loading: false,
       })
@@ -92,6 +107,8 @@ export default function Dashboard() {
           <span className="water-label">POND 01&nbsp; · &nbsp;IN SEASON</span>
         </div>
       </section>
+
+      <PondWeather ponds={overview.weatherPonds} />
 
       {overview.error && <p className="form-message error-message" role="alert">{overview.error}</p>}
 

@@ -5,12 +5,14 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TeluguHint } from '@/components/ui/telugu-hint'
+import { PondLocationPicker, type PondLocation } from '@/components/workspace/pond-location-picker'
 import { supabase } from '@/lib/supabase/client'
 
 export default function OnboardingPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [pondLocation, setPondLocation] = useState<PondLocation | null>(null)
 
   async function createFarm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -31,6 +33,9 @@ export default function OnboardingPage() {
         target_harvest_days_input: values.get('target_harvest_days')
           ? Number(values.get('target_harvest_days'))
           : null,
+        locality_input: pondLocation?.label ?? null,
+        latitude_input: pondLocation?.latitude ?? null,
+        longitude_input: pondLocation?.longitude ?? null,
       })
       if (setupError) throw setupError
       form.reset()
@@ -77,6 +82,7 @@ export default function OnboardingPage() {
             <label className="field"><span>Pond name</span><Input name="pond_name" placeholder="e.g. Pond 01" required minLength={1} /><TeluguHint>మీరు గుర్తుపట్టేందుకు చెరువుకు పేరు పెట్టండి.</TeluguHint></label>
             <label className="field"><span>Area in acres <small>Optional</small></span><Input name="area_acres" type="number" min="0.01" step="0.01" placeholder="1.5" /><TeluguHint>చెరువు విస్తీర్ణం ఎకరాల్లో రాయండి.</TeluguHint></label>
           </div>
+          <PondLocationPicker onSelect={setPondLocation} onQueryChange={() => setPondLocation(null)} />
           <div className="form-section-title"><span className="onboarding-form-icon green">↗</span><div><strong>Current culture cycle</strong><span>Link every water, feed, and growth log to a real cycle.</span><TeluguHint>ఇప్పుడు చెరువులో ఉన్న రొయ్యల బ్యాచ్‌ వివరాలు ఇవ్వండి. తర్వాతి రికార్డులు ఈ బ్యాచ్‌కు జత అవుతాయి.</TeluguHint></div></div>
           <div className="field-grid">
             <label className="field"><span>Seed stock (count)</span><Input name="seed_stocked" type="number" min="1" step="1" placeholder="50000" required /><TeluguHint>చెరువులో వదిలిన పిల్ల రొయ్యల మొత్తం సంఖ్య.</TeluguHint></label>

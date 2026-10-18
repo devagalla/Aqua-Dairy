@@ -8,12 +8,15 @@ import { supabase } from '@/lib/supabase/client'
 
 type RecordKind = 'water' | 'feed' | 'growth' | 'expenses'
 type FarmOption = { id: string; name: string }
+type PondOption = { id: string; name: string; farmId: string; farmName: string }
 type CycleOption = {
   id: string
+  pond_id: string
   stocking_date: string
-  pond?: { name?: string; farm?: { name?: string } }
+  pond?: { id?: string; name?: string; farm_id?: string; farm?: { name?: string } }
 }
-type RecentRecord = Record<string, string | number | null>
+type RecentRecord = { id: string } & Record<string, string | number | null>
+const HISTORY_PAGE_SIZE = 10
 
 const config: Record<
   RecordKind,
@@ -72,25 +75,34 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
   const page = config[kind]
   const [farms, setFarms] = useState<FarmOption[]>([])
   const [cycles, setCycles] = useState<CycleOption[]>([])
+  const [ponds, setPonds] = useState<PondOption[]>([])
   const [records, setRecords] = useState<RecentRecord[]>([])
   const [farmId, setFarmId] = useState('')
   const [cycleId, setCycleId] = useState('')
+  const [expenseScope, setExpenseScope] = useState<'farm' | 'pond'>('farm')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [hasMoreRecords, setHasMoreRecords] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null)
 
-  const loadRecords = useCallback(async () => {
+  const loadRecords = useCallback(async (from = 0) => {
     const result = await supabase
       .from(page.table)
       .select('*')
       .order(page.dateColumn, { ascending: false })
-      .limit(6)
+      .range(from, from + HISTORY_PAGE_SIZE)
     if (result.error) {
       setError(result.error.message)
-      return
+      return false
     }
-    setRecords((result.data ?? []) as RecentRecord[])
+    const rows = (result.data ?? []) as RecentRecord[]
+    setHasMoreRecords(rows.length > HISTORY_PAGE_SIZE)
+    const visibleRows = rows.slice(0, HISTORY_PAGE_SIZE)
+    setRecords((current) => from > 0 ? [...current, ...visibleRows] : visibleRows)
+    return true
   }, [page.dateColumn, page.table])
 
   useEffect(() => {
@@ -101,7 +113,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         supabase.from('farms').select('id, name').order('created_at'),
         supabase
           .from('culture_cycles')
-          .select('id, stocking_date, ponds(name, farms(name))')
+          .select('id, pond_id, stocking_date, ponds(id, name, farm_id, farms(name))')
           .order('stocking_date', { ascending: false }),
       ])
       if (cancelled) return
@@ -109,16 +121,32 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
       if (cycleResult.error) setError(cycleResult.error.message)
       const farmRows = (farmResult.data ?? []) as FarmOption[]
       const cycleRows = (cycleResult.data ?? []).map((row) => {
-        const relation = row.ponds as unknown as
-          | { name?: string; farms?: { name?: string } }
+        const relation = row.ponds as
+          | { id?: string; name?: string; farm_id?: string; farms?: { name?: string } }
           | null
         return {
           ...row,
-          pond: { name: relation?.name, farm: relation?.farms },
+          pond: {
+            id: relation?.id,
+            name: relation?.name,
+            farm_id: relation?.farm_id,
+            farm: relation?.farms,
+          },
         }
       }) as CycleOption[]
+      const pondRows = new Map<string, PondOption>()
+      for (const cycle of cycleRows) {
+        if (!cycle.pond_id || pondRows.has(cycle.pond_id)) continue
+        pondRows.set(cycle.pond_id, {
+          id: cycle.pond_id,
+          name: cycle.pond?.name ?? 'Pond',
+          farmId: cycle.pond?.farm_id ?? '',
+          farmName: cycle.pond?.farm?.name ?? 'Farm',
+        })
+      }
       setFarms(farmRows)
       setCycles(cycleRows)
+      setPonds(Array.from(pondRows.values()))
       setFarmId((current) => current || farmRows[0]?.id || '')
       setCycleId((current) => current || cycleRows[0]?.id || '')
       await loadRecords()
@@ -141,6 +169,12 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     const numberOrNull = (name: string) => {
       const value = get(name)
       return value === '' ? null : Number(value)
+    }
+    const recordFarmId = expenseScope === 'pond' ? selectedCycle?.pond?.farm_id ?? '' : farmId
+    if (kind === 'expenses' && !recordFarmId) {
+      setError('Choose a farm or pond for this expense.')
+      setSaving(false)
+      return
     }
     const timestamp = (name: string) => new Date(get(name)).toISOString()
     let table = page.table
@@ -198,7 +232,8 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
       }
     } else {
       payload = {
-        farm_id: farmId,
+        farm_id: recordFarmId,
+        cycle_id: expenseScope === 'pond' ? cycleId : null,
         spent_at: get('spent_at'),
         category: get('category'),
         description: get('description'),
@@ -226,8 +261,39 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     }
   }
 
+  async function deleteRecord(record: RecentRecord) {
+    if (!window.confirm('Delete this entry? This cannot be undone.')) return
+    setError('')
+    setMessage('')
+    setDeletingRecordId(record.id)
+    try {
+      const { error: deleteError } = await supabase
+        .from(page.table)
+        .delete()
+        .eq('id', record.id)
+      if (deleteError) throw deleteError
+      setMessage('Entry deleted.')
+      await loadRecords()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not delete this entry.')
+    } finally {
+      setDeletingRecordId(null)
+    }
+  }
+
+  async function loadMoreRecords() {
+    setError('')
+    setLoadingMore(true)
+    try {
+      await loadRecords(records.length)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   const canRecord = kind === 'expenses' ? farms.length > 0 : cycles.length > 0
   const selectedCycle = cycles.find((cycle) => cycle.id === cycleId)
+  const selectedPondId = selectedCycle?.pond_id ?? ''
 
   return (
     <div className="page-stack">
@@ -251,6 +317,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
           <Link className="button-primary" href="/onboarding">Set up my farm <span aria-hidden="true">→</span></Link>
         </section>
       ) : (
+        <>
         <div className="record-layout">
           <section className="card-surface record-form-card animate-in">
             <div className="card-heading">
@@ -265,22 +332,52 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
             ) : (
               <form className="record-form" onSubmit={save}>
                 {kind === 'expenses' ? (
-                  <label className="field">
-                    <span>Farm</span>
-                    <select required value={farmId} onChange={(event) => setFarmId(event.target.value)}>
-                      {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}
-                    </select>
-                    <TeluguHint>ఈ ఖర్చు ఏ ఫారానికి చెందుతుందో ఎంచుకోండి.</TeluguHint>
-                  </label>
+                  <>
+                    <label className="field">
+                      <span>Expense scope</span>
+                      <select value={expenseScope} onChange={(event) => setExpenseScope(event.target.value === 'pond' ? 'pond' : 'farm')}>
+                        <option value="farm">Farm-wide expense</option>
+                        <option value="pond" disabled={ponds.length === 0}>Specific pond / cycle</option>
+                      </select>
+                      <TeluguHint>మొత్తం ఫారం ఖర్చుగా లేదా ఒక చెరువు బ్యాచ్ ఖర్చుగా నమోదు చేయండి.</TeluguHint>
+                    </label>
+                    {expenseScope === 'farm' ? (
+                      <label className="field">
+                        <span>Farm</span>
+                        <select required value={farmId} onChange={(event) => setFarmId(event.target.value)}>
+                          {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name}</option>)}
+                        </select>
+                        <TeluguHint>ఈ ఖర్చు ఏ ఫారానికి చెందుతుందో ఎంచుకోండి.</TeluguHint>
+                      </label>
+                    ) : (
+                      <label className="field">
+                        <span>Pond</span>
+                        <select
+                          required
+                          value={selectedPondId}
+                          onChange={(event) => setCycleId(cycles.find((cycle) => cycle.pond_id === event.target.value)?.id ?? '')}
+                        >
+                          {ponds.map((pond) => {
+                            const cycle = cycles.find((candidate) => candidate.pond_id === pond.id)
+                            return <option key={pond.id} value={pond.id}>{pond.name} · {pond.farmName}{cycle ? ` · ${cycle.stocking_date}` : ''}</option>
+                          })}
+                        </select>
+                        <TeluguHint>ఈ ఖర్చు ఏ చెరువు పెంపకం బ్యాచ్‌కు చెందుతుందో ఎంచుకోండి.</TeluguHint>
+                      </label>
+                    )}
+                  </>
                 ) : (
                   <label className="field">
-                    <span>Culture cycle</span>
-                    <select required value={cycleId} onChange={(event) => setCycleId(event.target.value)}>
-                      {cycles.map((cycle) => (
-                        <option key={cycle.id} value={cycle.id}>
-                          {cycle.pond?.name ?? 'Pond'} · {cycle.pond?.farm?.name ?? 'Farm'} · started {cycle.stocking_date}
-                        </option>
-                      ))}
+                    <span>Pond</span>
+                    <select
+                      required
+                      value={selectedPondId}
+                      onChange={(event) => setCycleId(cycles.find((cycle) => cycle.pond_id === event.target.value)?.id ?? '')}
+                    >
+                      {ponds.map((pond) => {
+                        const cycle = cycles.find((candidate) => candidate.pond_id === pond.id)
+                        return <option key={pond.id} value={pond.id}>{pond.name} · {pond.farmName}{cycle ? ` · started ${cycle.stocking_date}` : ''}</option>
+                      })}
                     </select>
                     <TeluguHint>ఈ వివరాలు ఏ చెరువు పెంపకం బ్యాచ్‌కు చెందుతాయో ఎంచుకోండి.</TeluguHint>
                     {selectedCycle && <small>This record will be linked to {selectedCycle.pond?.name ?? 'your selected pond'}.</small>}
@@ -325,8 +422,6 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                 {kind === 'water' && (
                   <label className="field"><span>Notes <small>Optional</small></span><textarea name="comment" rows={3} placeholder="Observations from the pond…" /><TeluguHint>చెరువులో గమనించిన విషయాలు రాయండి.</TeluguHint></label>
                 )}
-                {error && <p className="form-message error-message" role="alert">{error}</p>}
-                {message && <p className="form-message success-message" role="status">{message}</p>}
                 <Button type="submit" disabled={saving || loading} className="button-primary submit-button">
                   {saving ? 'Saving your record…' : page.cta} <span aria-hidden="true">→</span>
                 </Button>
@@ -334,14 +429,17 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
             )}
           </section>
 
-          <section className="card-surface recent-card animate-in animate-delay">
+        </div>
+        <section className="card-surface recent-card animate-in animate-delay">
             <div className="card-heading">
               <div>
                 <span className="eyebrow">YOUR FARM JOURNAL</span>
-                <h2>Recent entries</h2>
+                <h2>Entry history</h2>
               </div>
-              <span className="record-count">{records.length} <small>recent</small></span>
+              <span className="record-count">{records.length} <small>shown</small></span>
             </div>
+            {error && <p className="form-message error-message" role="alert">{error}</p>}
+            {message && <p className="form-message success-message" role="status">{message}</p>}
             {loading ? <p className="quiet-state">Finding your latest records…</p> : records.length === 0 ? (
               <div className="journal-empty">
                 <span aria-hidden="true">✧</span>
@@ -358,13 +456,32 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                       <span>{new Date(String(record[page.dateColumn])).toLocaleString()}</span>
                     </div>
                     <span className="journal-value">{recentValue(kind, record)}</span>
+                    <button
+                      type="button"
+                      className="journal-delete"
+                      onClick={() => void deleteRecord(record)}
+                      disabled={deletingRecordId !== null}
+                      aria-label={`Delete ${recentTitle(kind, record)} entry`}
+                    >
+                      {deletingRecordId === record.id ? 'Deleting…' : 'Delete'}
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
+            {hasMoreRecords && (
+              <Button
+                type="button"
+                className="journal-load-more"
+                onClick={() => void loadMoreRecords()}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Loading history…' : 'Load more entries'}
+              </Button>
+            )}
             <div className="journal-footer"><span className="status-pulse" />Synced with your farm records</div>
-          </section>
-        </div>
+        </section>
+        </>
       )}
     </div>
   )
