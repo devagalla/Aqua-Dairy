@@ -34,6 +34,20 @@ type GoogleGeocoderResult = {
   address_components: Array<{ long_name: string; types: string[] }>
 }
 
+function locationSearchError(caught: unknown) {
+  const detail = caught instanceof Error ? caught.message : String(caught)
+  if (
+    detail.includes('Places API (New)') &&
+    (detail.includes('not been used') || detail.includes('disabled'))
+  ) {
+    return 'Google Places API (New) is not enabled for this Google Cloud project. Enable it in Google Cloud Console → APIs & Services → Library. Adding it to the API key restrictions alone does not enable the API.'
+  }
+  if (detail.includes('PERMISSION_DENIED')) {
+    return `Google Places rejected this key. Check that Places API (New) is enabled for its project and allowed in this key's API restrictions. ${detail}`
+  }
+  return detail || 'Could not search for this location.'
+}
+
 type GoogleMapsApi = {
   importLibrary: (name: string) => Promise<unknown>
   Geocoder: new () => {
@@ -124,7 +138,7 @@ export function PondLocationPicker({
         }
       } catch (caught) {
         if (controller.signal.aborted) return
-        setError(caught instanceof Error ? caught.message : 'Could not search for this location.')
+        setError(locationSearchError(caught))
       } finally {
         if (!controller.signal.aborted) setBusy(false)
       }
@@ -146,7 +160,7 @@ export function PondLocationPicker({
       await onSelect(location)
       setNotice('Location saved for this pond.')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save this pond location.')
+      setError(locationSearchError(caught))
     }
   }
 
@@ -165,7 +179,7 @@ export function PondLocationPicker({
         longitude: place.location.lng(),
       })
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save this pond location.')
+      setError(locationSearchError(caught))
     } finally {
       setBusy(false)
     }
@@ -213,7 +227,7 @@ export function PondLocationPicker({
         ? geolocationCode === 1
           ? 'Location permission was denied. Allow it in browser settings, or search for your locality.'
           : 'Could not get your location. Search for your locality instead.'
-        : caught instanceof Error ? caught.message : 'Could not use your current location.'
+        : locationSearchError(caught)
       setError(message)
     } finally {
       setBusy(false)
