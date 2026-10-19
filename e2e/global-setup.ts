@@ -13,7 +13,7 @@ async function globalSetup(config: FullConfig) {
   // Create test user in Supabase using service role
   // Use require to get the env vars that were set at config load time
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xyxqtpzdkgtpjbsybsms.supabase.co'
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '***REMOVED***'
+  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !serviceRoleKey) {
     console.log('⚠️  Supabase credentials not configured, skipping test user creation')

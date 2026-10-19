@@ -5,7 +5,7 @@ process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST = 'true'
 
 // Pass Supabase credentials to global setup and tests
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 const testEmail = process.env.E2E_TEST_EMAIL || 'test-farmer@aquadairy.local'
 const testPassword = process.env.E2E_TEST_PASSWORD || 'TestPass123!'
 
