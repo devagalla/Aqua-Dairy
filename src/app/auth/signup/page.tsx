@@ -1,12 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import type { TurnstileInstance } from '@marsidev/react-turnstile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TurnstileCaptcha } from '@/components/auth/turnstile-captcha'
 import { supabase } from '@/lib/supabase/client'
+
+const isTestMode = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true'
 
 export default function SignUp() {
   const [email, setEmail] = useState('')
@@ -19,9 +21,17 @@ export default function SignUp() {
   const [captchaToken, setCaptchaToken] = useState('')
   const captchaRef = useRef<TurnstileInstance>()
 
+  // Test mode: auto-set captcha token
+  useEffect(() => {
+    if (isTestMode) {
+      setCaptchaToken('playwright-test-token-' + Date.now())
+    }
+  }, [])
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!captchaToken) {
+    // In test mode, skip captcha validation
+    if (!isTestMode && !captchaToken) {
       setError('Complete the security check before creating your account.')
       return
     }
@@ -32,7 +42,7 @@ export default function SignUp() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-        captchaToken,
+        ...(isTestMode ? {} : { captchaToken }),
       },
     })
     captchaRef.current?.reset()
@@ -54,7 +64,8 @@ export default function SignUp() {
   }
 
   async function resendEmail() {
-    if (!captchaToken) {
+    // In test mode, skip captcha validation
+    if (!isTestMode && !captchaToken) {
       setError('Complete the security check before requesting another email.')
       return
     }
@@ -65,7 +76,7 @@ export default function SignUp() {
       email,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-        captchaToken,
+        ...(isTestMode ? {} : { captchaToken }),
       },
     })
     captchaRef.current?.reset()
@@ -95,7 +106,7 @@ export default function SignUp() {
             ) : (
               <>
                 <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
-                <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy || !captchaToken}>
+                <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy || (!isTestMode && !captchaToken)}>
                   {busy ? 'Requesting a link…' : 'Need to verify? Request a new link'}
                 </button>
               </>
@@ -118,7 +129,7 @@ export default function SignUp() {
             {resent ? <p className="success-message form-message" role="status">Verification request accepted. If this account still needs confirmation, check your inbox and spam folder. Delivery depends on your email provider settings.</p> : (
               <>
                 <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
-                <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy || !captchaToken}>Didn&apos;t get the email? Request another link</button>
+                <button className="quiet-link" type="button" onClick={resendEmail} disabled={busy || (!isTestMode && !captchaToken)}>Didn&apos;t get the email? Request another link</button>
               </>
             )}
             {error && <p className="form-message error-message" role="alert">{error}</p>}
@@ -135,7 +146,7 @@ export default function SignUp() {
               <label className="field"><span>Create a password</span><Input type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><small>Use at least 8 characters.</small><span className="telugu-hint" lang="te">కనీసం 8 అక్షరాలు లేదా అంకెలతో పాస్‌వర్డ్ పెట్టండి.</span></label>
               <TurnstileCaptcha captchaRef={captchaRef} onToken={setCaptchaToken} />
               {error && <p className="form-message error-message" role="alert">{error}</p>}
-              <Button type="submit" className="button-primary submit-button" disabled={busy || !captchaToken}>{busy ? 'Creating your account…' : 'Create my account'} <span aria-hidden="true">→</span></Button>
+              <Button type="submit" className="button-primary submit-button" disabled={busy || (!isTestMode && !captchaToken)}>{busy ? 'Creating your account…' : 'Create my account'} <span aria-hidden="true">→</span></Button>
             </form>
             <p className="auth-switch">Already have an account? <Link href="/auth/signin">Sign in</Link></p>
           </>

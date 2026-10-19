@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase/client'
 
+const isTestMode = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true'
+
 export default function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,6 +22,13 @@ export default function SignIn() {
   const [captchaToken, setCaptchaToken] = useState('')
   const captchaRef = useRef<TurnstileInstance>()
 
+  // Test mode: auto-set captcha token
+  useEffect(() => {
+    if (isTestMode) {
+      setCaptchaToken('playwright-test-token-' + Date.now())
+    }
+  }, [])
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('verified') === 'error') {
@@ -31,7 +40,8 @@ export default function SignIn() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!captchaToken) {
+    // In test mode, skip captcha validation
+    if (!isTestMode && !captchaToken) {
       setError('Complete the security check before signing in.')
       return
     }
@@ -43,7 +53,7 @@ export default function SignIn() {
     const { error: signinError } = await supabase.auth.signInWithPassword({
       email,
       password,
-      options: { captchaToken },
+      options: isTestMode ? {} : { captchaToken },
     })
     captchaRef.current?.reset()
     setCaptchaToken('')
@@ -119,13 +129,13 @@ export default function SignIn() {
               className="quiet-link resend-signin-link"
               type="button"
               onClick={resendVerification}
-              disabled={resending || !email || !captchaToken}
+              disabled={resending || !email || (!isTestMode && !captchaToken)}
             >
               {resending ? 'Requesting a link…' : 'Resend verification email'}
             </button>
           )}
           {resendNotice && <p className="form-message success-message" role="status">{resendNotice}</p>}
-          <Button type="submit" className="button-primary submit-button" disabled={busy || !captchaToken}>{busy ? 'Signing you in…' : 'Sign in to your farm'} <span aria-hidden="true">→</span></Button>
+          <Button type="submit" className="button-primary submit-button" disabled={busy || (!isTestMode && !captchaToken)}>{busy ? 'Signing you in…' : 'Sign in to your farm'} <span aria-hidden="true">→</span></Button>
         </form>
         <p className="auth-switch">New to Aqua Dairy? <Link href="/auth/signup">Create an account</Link></p>
       </section>

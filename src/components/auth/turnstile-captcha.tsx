@@ -2,9 +2,10 @@
 
 import { Turnstile } from '@marsidev/react-turnstile'
 import type { TurnstileInstance } from '@marsidev/react-turnstile'
-import { useState, type RefObject } from 'react'
+import { useState, type RefObject, useEffect } from 'react'
 
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
+const isTestMode = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true'
 
 export function TurnstileCaptcha({
   captchaRef,
@@ -14,6 +15,18 @@ export function TurnstileCaptcha({
   onToken: (token: string) => void
 }) {
   const [widgetError, setWidgetError] = useState('')
+
+  // Test mode: auto-generate a valid token for E2E tests and skip Turnstile entirely
+  useEffect(() => {
+    if (isTestMode) {
+      const testToken = 'playwright-test-token-' + Date.now()
+      onToken(testToken)
+    }
+  }, [isTestMode, onToken])
+
+  if (isTestMode) {
+    return null // Test mode - token auto-generated above, no UI needed
+  }
 
   if (!siteKey) {
     return (

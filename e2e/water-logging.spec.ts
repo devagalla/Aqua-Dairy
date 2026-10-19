@@ -4,14 +4,6 @@ import { TEST_USERS, TEST_FARM, TEST_POND, TEST_CYCLE } from './fixtures/test-da
 test.describe.configure({ retries: 0 })
 
 test.describe('Water Logging & Advisor Feedback', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/auth/signin')
-    await page.fill('input[type=email]', TEST_USERS.primary.email)
-    await page.fill('input[type=password]', TEST_USERS.primary.password)
-    await page.click('button:has-text("Sign in")')
-    await expect(page).toHaveURL(/\/dashboard/)
-  })
-
   test('Farmer can log water reading and see real-time advisor feedback (green/yellow/red)', async ({ page }) => {
     await page.goto('/water')
 
@@ -44,7 +36,7 @@ test.describe('Water Logging & Advisor Feedback', () => {
     await expect(criticalIndicators.first()).toBeVisible({ timeout: 5000 })
 
     // Save the reading
-    await page.click('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first()
+    await page.locator('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first().click()
 
     // Verify success toast/notification
     await expect(page.locator('text=/saved|recorded|logged/i')).toBeVisible({ timeout: 10000 })
@@ -105,7 +97,7 @@ test.describe('Water Logging & Advisor Feedback', () => {
     await page.fill('input[name=ammonia_mg_l]', '0.02')
     await page.fill('input[name=nitrite_mg_l]', '0.02')
 
-    await page.click('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first()
+    await page.locator('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first().click()
     await expect(page.locator('text=/saved|recorded|logged/i')).toBeVisible({ timeout: 10000 })
 
     // Navigate to history/list view if available
@@ -116,14 +108,6 @@ test.describe('Water Logging & Advisor Feedback', () => {
 })
 
 test.describe('Offline Queue & Sync', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/auth/signin')
-    await page.fill('input[type=email]', TEST_USERS.primary.email)
-    await page.fill('input[type=password]', TEST_USERS.primary.password)
-    await page.click('button:has-text("Sign in")')
-    await expect(page).toHaveURL(/\/dashboard/)
-  })
-
   test('Shows offline indicator when network disconnected', async ({ page }) => {
     // Check initial online status
     await expect(page.locator('text=All records synced')).toBeVisible({ timeout: 10000 })
@@ -161,7 +145,7 @@ test.describe('Offline Queue & Sync', () => {
     await page.waitForTimeout(500)
 
     // Save while offline
-    await page.click('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first()
+    await page.locator('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first().click()
 
     // Should show saved locally message or remain on page
     await expect(page.locator('text=/saved|queued|offline/i')).toBeVisible({ timeout: 10000 })
@@ -176,14 +160,6 @@ test.describe('Offline Queue & Sync', () => {
 })
 
 test.describe('Navigation & Core Flows', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/auth/signin')
-    await page.fill('input[type=email]', TEST_USERS.primary.email)
-    await page.fill('input[type=password]', TEST_USERS.primary.password)
-    await page.click('button:has-text("Sign in")')
-    await expect(page).toHaveURL(/\/dashboard/)
-  })
-
   test('Dashboard loads with farm stats', async ({ page }) => {
     await expect(page.locator('text=/ponds?|farm/i')).toBeVisible({ timeout: 10000 })
     await expect(page.locator('text=/active cycles?/i')).toBeVisible()
@@ -217,7 +193,7 @@ test.describe('Navigation & Core Flows', () => {
     await page.fill('input[name=amount_kg]', '25')
     await page.fill('input[name=feed_tray_observation]', 'Good consumption, minimal waste')
 
-    await page.click('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first()
+    await page.locator('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first().click()
     await expect(page.locator('text=/saved|recorded|logged/i')).toBeVisible({ timeout: 10000 })
   })
 
@@ -231,7 +207,7 @@ test.describe('Navigation & Core Flows', () => {
     await page.fill('input[name=total_weight_g]', '1250')
     await page.fill('input[name=average_weight_g]', '25')
 
-    await page.click('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first()
+    await page.locator('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first().click()
     await expect(page.locator('text=/saved|recorded|logged/i')).toBeVisible({ timeout: 10000 })
   })
 
@@ -245,20 +221,12 @@ test.describe('Navigation & Core Flows', () => {
     await page.fill('input[name=amount]', '15000')
     await page.fill('input[name=description]', 'Monthly feed purchase')
 
-    await page.click('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first()
+    await page.locator('button:has-text("Save"), button:has-text("Log"), button[type=submit]').first().click()
     await expect(page.locator('text=/saved|recorded|logged/i')).toBeVisible({ timeout: 10000 })
   })
 })
 
 test.describe('Alerts', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/auth/signin')
-    await page.fill('input[type=email]', TEST_USERS.primary.email)
-    await page.fill('input[type=password]', TEST_USERS.primary.password)
-    await page.click('button:has-text("Sign in")')
-    await expect(page).toHaveURL(/\/dashboard/)
-  })
-
   test('Alerts page loads and shows severity colors', async ({ page }) => {
     await page.goto('/alerts')
     await expect(page.locator('text=/alerts?/i')).toBeVisible({ timeout: 10000 })
@@ -272,14 +240,6 @@ test.describe('Alerts', () => {
 
 test.describe('Mobile Responsive', () => {
   test.use({ viewport: { width: 375, height: 667 } }) // iPhone SE
-
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/auth/signin')
-    await page.fill('input[type=email]', TEST_USERS.primary.email)
-    await page.fill('input[type=password]', TEST_USERS.primary.password)
-    await page.click('button:has-text("Sign in")')
-    await expect(page).toHaveURL(/\/dashboard/)
-  })
 
   test('Mobile bottom navigation works', async ({ page }) => {
     // Mobile nav should be visible
