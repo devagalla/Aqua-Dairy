@@ -14,6 +14,7 @@ export type WeatherPond = {
 
 type WeatherResponse = {
   current: {
+    time: string
     temperature_2m: number
     apparent_temperature: number
     relative_humidity_2m: number
@@ -54,8 +55,9 @@ type ForecastState = {
   history?: HistoricalWeatherResponse
 }
 
-function dateDaysAgo(days: number) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+function previousLocalDate(date: string) {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day - 1, 12)).toISOString().slice(0, 10)
 }
 
 function weatherDescription(code: number) {
@@ -94,25 +96,34 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
       forecastUrl.searchParams.set('timezone', 'auto')
       forecastUrl.searchParams.set('forecast_days', '7')
 
-      const historyDate = dateDaysAgo(7)
-      const historyUrl = new URL('https://archive-api.open-meteo.com/v1/archive')
-      historyUrl.searchParams.set('latitude', String(pond.latitude))
-      historyUrl.searchParams.set('longitude', String(pond.longitude))
-      historyUrl.searchParams.set('hourly', 'temperature_2m,precipitation,cloud_cover,shortwave_radiation')
-      historyUrl.searchParams.set('start_date', historyDate)
-      historyUrl.searchParams.set('end_date', historyDate)
-      historyUrl.searchParams.set('timezone', 'auto')
+      const forecastResult = await fetch(forecastUrl, { cache: 'no-store' }).then(async (response) => {
+        if (!response.ok) throw new Error(`Forecast unavailable (${response.status}).`)
+        return await response.json() as WeatherResponse
+      }).then(
+        (data) => ({ status: 'fulfilled' as const, value: data }),
+        (reason: unknown) => ({ status: 'rejected' as const, reason }),
+      )
 
-      const [forecastResult, historyResult] = await Promise.allSettled([
-        fetch(forecastUrl).then(async (response) => {
-          if (!response.ok) throw new Error(`Forecast unavailable (${response.status}).`)
-          return await response.json() as WeatherResponse
-        }),
-        fetch(historyUrl).then(async (response) => {
+      let historyResult: PromiseSettledResult<HistoricalWeatherResponse>
+      if (forecastResult.status === 'fulfilled') {
+        const historyDate = previousLocalDate(forecastResult.value.daily.time[0])
+        const historyUrl = new URL('https://archive-api.open-meteo.com/v1/archive')
+        historyUrl.searchParams.set('latitude', String(pond.latitude))
+        historyUrl.searchParams.set('longitude', String(pond.longitude))
+        historyUrl.searchParams.set('hourly', 'temperature_2m,precipitation,cloud_cover,shortwave_radiation')
+        historyUrl.searchParams.set('start_date', historyDate)
+        historyUrl.searchParams.set('end_date', historyDate)
+        historyUrl.searchParams.set('timezone', 'auto')
+        historyResult = await fetch(historyUrl, { cache: 'no-store' }).then(async (response) => {
           if (!response.ok) throw new Error(`Historical weather unavailable (${response.status}).`)
           return await response.json() as HistoricalWeatherResponse
-        }),
-      ])
+        }).then(
+          (data) => ({ status: 'fulfilled' as const, value: data }),
+          (reason: unknown) => ({ status: 'rejected' as const, reason }),
+        )
+      } else {
+        historyResult = { status: 'rejected', reason: 'History unavailable because the forecast could not be loaded.' }
+      }
 
       if (!cancelled) {
         setForecastByPond((current) => ({
@@ -165,7 +176,11 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
                 <>
                   <div className="weather-current">
                     <strong>{Math.round(forecast.data.current.temperature_2m)}°</strong>
-                    <div><span>{weatherDescription(forecast.data.current.weather_code)}</span><small>Feels like {Math.round(forecast.data.current.apparent_temperature)}°</small></div>
+                    <div>
+                      <span>{weatherDescription(forecast.data.current.weather_code)}</span>
+                      <small>Feels like {Math.round(forecast.data.current.apparent_temperature)}°</small>
+                      <small>Updated today at {forecast.data.current.time.slice(-5)} local time</small>
+                    </div>
                   </div>
                   <div className="weather-details">
                     <span>Humidity <b>{forecast.data.current.relative_humidity_2m}%</b></span>
@@ -192,7 +207,7 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
                 <p className="quiet-state weather-history-state">Loading hourly historical weather…</p>
               ) : forecast?.history ? (
                 <details className="weather-history">
-                  <summary>Hourly history · {forecast.history.hourly.time[0]?.slice(0, 10) ?? 'recent day'}</summary>
+                  <summary>Yesterday · {forecast.history.hourly.time[0]?.slice(0, 10) ?? 'recent day'}</summary>
                   <div className="weather-history-grid">
                     {forecast.history.hourly.time.map((time, index) => (
                       <div key={time}>
@@ -212,7 +227,7 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
           )
         })}
       </div>
-      <p className="weather-attribution">Forecast and historical data by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. History is shown for seven days ago to allow for archive data availability; both are estimates for the saved pond location.</p>
+      <p className="weather-attribution">Current conditions and forecast by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>, refreshed on load. The expandable hourly view shows yesterday&apos;s historical weather for the saved pond location.</p>
     </section>
   )
 }
