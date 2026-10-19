@@ -378,6 +378,21 @@ textarea:focus-visible {
 .shortcut-green .shortcut-glyph { background: #eff4dc; color: #779c50; }
 .shortcut-violet .shortcut-glyph { background: #efedf7; color: #887eb2; }
 .shortcut-amber .shortcut-glyph { background: #fbf0de; color: #c28b42; }
+.health-screening { display: grid; justify-items: start; gap: 12px; padding: 20px; }
+.health-screening .card-heading { width: 100%; margin-bottom: 0; }
+.health-screening-intro, .health-disclaimer { max-width: 760px; margin: 0; color: #71857a; font-size: 11px; line-height: 1.7; }
+.health-file-hint, .health-model-note { color: #8b9b91; font-size: 9px; line-height: 1.5; }
+.health-image-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.health-result { display: grid; width: 100%; grid-template-columns: minmax(140px, 250px) minmax(0, 1fr); gap: 18px; align-items: start; border-top: 1px solid #edf0e8; padding-top: 17px; }
+.health-result > img { display: block; width: 100%; max-height: 250px; border-radius: 6px; background: #eef1e9; object-fit: contain; }
+.health-result > .quiet-state { align-self: center; }
+.health-prediction { display: grid; gap: 7px; }
+.health-prediction h3 { margin: 0; color: #315b4e; font-family: Georgia, serif; font-size: 20px; font-weight: 500; }
+.health-prediction > p { margin: 0; color: #7d8f84; font-size: 10px; line-height: 1.6; }
+.health-prediction ul { display: grid; gap: 7px; margin: 3px 0; padding: 0; list-style: none; }
+.health-prediction li { display: flex; justify-content: space-between; gap: 12px; border-radius: 4px; background: #f6f8f2; padding: 8px 10px; color: #697f72; font-size: 10px; }
+.health-prediction li b { color: #315b4e; }
+.health-disclaimer { border-top: 1px solid #edf0e8; padding-top: 12px; color: #8b7d67; }
 .dashboard-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
 .dashboard-insight { padding: 19px; }
 .insight-glyph { display: grid; width: 33px; height: 33px; place-items: center; border-radius: 50%; background: #e8f3e9; color: #4c998a; font-size: 20px; }
@@ -441,10 +456,17 @@ textarea:focus-visible {
 .weather-details { display: flex; flex-wrap: wrap; gap: 8px 14px; border-bottom: 1px solid #edf0e8; padding-bottom: 12px; color: #83938a; font-size: 9px; }
 .weather-details span { display: flex; gap: 4px; }
 .weather-details b { color: #526e61; font-weight: 700; }
-.weather-days { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+.weather-days { display: grid; grid-template-columns: repeat(7, minmax(112px, 1fr)); gap: 7px; overflow-x: auto; margin-top: 12px; padding-bottom: 4px; }
 .weather-days > div { display: grid; min-width: 0; gap: 5px; border-radius: 5px; background: #f6f8f2; padding: 9px 7px; }
 .weather-days strong { color: #536e62; font-size: 10px; }
-.weather-days span, .weather-days small { overflow: hidden; color: #829289; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.weather-days span, .weather-days small { color: #829289; font-size: 8px; line-height: 1.4; }
+.weather-history { margin-top: 12px; border-top: 1px solid #edf0e8; padding-top: 10px; }
+.weather-history summary { color: #527064; cursor: pointer; font-size: 10px; font-weight: 700; }
+.weather-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; max-height: 260px; overflow: auto; margin-top: 10px; }
+.weather-history-grid > div { display: grid; gap: 4px; border-radius: 4px; background: #f6f8f2; padding: 7px; }
+.weather-history-grid strong { color: #536e62; font-size: 9px; }
+.weather-history-grid span, .weather-history-grid small { color: #829289; font-size: 8px; line-height: 1.4; }
+.weather-history-state { margin-top: 10px; }
 .weather-attribution { margin: 0; color: #91a096; font-size: 9px; }
 .weather-empty { display: grid; gap: 8px; margin-top: 14px; }
 .weather-empty p { margin: 0; color: #829289; font-size: 11px; line-height: 1.6; }
@@ -525,6 +547,8 @@ textarea:focus-visible {
   .hero-action { margin-top: 16px; }
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .finance-dashboard .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .health-result { grid-template-columns: 1fr; }
+  .health-result > img { width: min(100%, 320px); max-height: 280px; }
   .stat-card { min-height: 109px; padding: 13px; }
   .stat-card strong { font-size: 24px; }
   .section-heading { align-items: start; }

@@ -18,6 +18,8 @@ type WeatherResponse = {
     apparent_temperature: number
     relative_humidity_2m: number
     precipitation: number
+    cloud_cover: number
+    shortwave_radiation: number
     weather_code: number
     wind_speed_10m: number
   }
@@ -27,10 +29,34 @@ type WeatherResponse = {
     temperature_2m_max: number[]
     temperature_2m_min: number[]
     precipitation_probability_max: number[]
+    precipitation_sum: number[]
+    cloud_cover_mean: number[]
+    shortwave_radiation_sum: number[]
   }
 }
 
-type ForecastState = { loading: boolean; error?: string; data?: WeatherResponse }
+type HistoricalWeatherResponse = {
+  hourly: {
+    time: string[]
+    temperature_2m: number[]
+    precipitation: number[]
+    cloud_cover: number[]
+    shortwave_radiation: number[]
+  }
+}
+
+type ForecastState = {
+  loading: boolean
+  error?: string
+  data?: WeatherResponse
+  historyLoading: boolean
+  historyError?: string
+  history?: HistoricalWeatherResponse
+}
+
+function dateDaysAgo(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
 
 function weatherDescription(code: number) {
   if (code === 0) return 'Clear sky'
@@ -54,31 +80,54 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
       (pond): pond is WeatherPond & { latitude: number; longitude: number } =>
         pond.latitude !== null && pond.longitude !== null,
     )
-    setForecastByPond(Object.fromEntries(locatedPonds.map((pond) => [pond.id, { loading: true }])))
+    setForecastByPond(Object.fromEntries(locatedPonds.map((pond) => [pond.id, {
+      loading: true,
+      historyLoading: true,
+    }])))
 
     async function loadForecast(pond: WeatherPond & { latitude: number; longitude: number }) {
-      try {
-        const url = new URL('https://api.open-meteo.com/v1/forecast')
-        url.searchParams.set('latitude', String(pond.latitude))
-        url.searchParams.set('longitude', String(pond.longitude))
-        url.searchParams.set('current', 'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m')
-        url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max')
-        url.searchParams.set('timezone', 'auto')
-        url.searchParams.set('forecast_days', '3')
-        const response = await fetch(url)
-        if (!response.ok) throw new Error(`Forecast unavailable (${response.status}).`)
-        const data = await response.json() as WeatherResponse
-        if (!cancelled) setForecastByPond((current) => ({ ...current, [pond.id]: { loading: false, data } }))
-      } catch (caught) {
-        if (!cancelled) {
-          setForecastByPond((current) => ({
-            ...current,
-            [pond.id]: {
-              loading: false,
-              error: caught instanceof Error ? caught.message : 'Could not load this forecast.',
-            },
-          }))
-        }
+      const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
+      forecastUrl.searchParams.set('latitude', String(pond.latitude))
+      forecastUrl.searchParams.set('longitude', String(pond.longitude))
+      forecastUrl.searchParams.set('current', 'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,cloud_cover,shortwave_radiation,weather_code,wind_speed_10m')
+      forecastUrl.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,cloud_cover_mean,shortwave_radiation_sum')
+      forecastUrl.searchParams.set('timezone', 'auto')
+      forecastUrl.searchParams.set('forecast_days', '7')
+
+      const historyDate = dateDaysAgo(7)
+      const historyUrl = new URL('https://archive-api.open-meteo.com/v1/archive')
+      historyUrl.searchParams.set('latitude', String(pond.latitude))
+      historyUrl.searchParams.set('longitude', String(pond.longitude))
+      historyUrl.searchParams.set('hourly', 'temperature_2m,precipitation,cloud_cover,shortwave_radiation')
+      historyUrl.searchParams.set('start_date', historyDate)
+      historyUrl.searchParams.set('end_date', historyDate)
+      historyUrl.searchParams.set('timezone', 'auto')
+
+      const [forecastResult, historyResult] = await Promise.allSettled([
+        fetch(forecastUrl).then(async (response) => {
+          if (!response.ok) throw new Error(`Forecast unavailable (${response.status}).`)
+          return await response.json() as WeatherResponse
+        }),
+        fetch(historyUrl).then(async (response) => {
+          if (!response.ok) throw new Error(`Historical weather unavailable (${response.status}).`)
+          return await response.json() as HistoricalWeatherResponse
+        }),
+      ])
+
+      if (!cancelled) {
+        setForecastByPond((current) => ({
+          ...current,
+          [pond.id]: {
+            loading: false,
+            historyLoading: false,
+            ...(forecastResult.status === 'fulfilled'
+              ? { data: forecastResult.value }
+              : { error: forecastResult.reason instanceof Error ? forecastResult.reason.message : 'Could not load this forecast.' }),
+            ...(historyResult.status === 'fulfilled'
+              ? { history: historyResult.value }
+              : { historyError: historyResult.reason instanceof Error ? historyResult.reason.message : 'Could not load historical weather.' }),
+          },
+        }))
       }
     }
 
@@ -91,7 +140,7 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
   return (
     <section className="pond-weather-section">
       <div className="section-heading">
-        <div><span className="eyebrow">WEATHER NEAR YOUR PONDS</span><h2>Local conditions &amp; forecast</h2><span className="telugu-subtitle" lang="te">మీ చెరువు దగ్గరి ప్రస్తుత వాతావరణం, రాబోయే మూడు రోజుల అంచనా.</span></div>
+        <div><span className="eyebrow">WEATHER NEAR YOUR PONDS</span><h2>Local conditions &amp; forecast</h2><span className="telugu-subtitle" lang="te">మీ చెరువు దగ్గరి ప్రస్తుత వాతావరణం, రాబోయే ఏడు రోజుల అంచనా.</span></div>
         <span className="section-meta">OPEN-METEO&nbsp; ↗</span>
       </div>
       <div className="pond-weather-grid">
@@ -122,24 +171,48 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
                     <span>Humidity <b>{forecast.data.current.relative_humidity_2m}%</b></span>
                     <span>Wind <b>{Math.round(forecast.data.current.wind_speed_10m)} km/h</b></span>
                     <span>Rain now <b>{forecast.data.current.precipitation} mm</b></span>
+                    <span>Cloud cover <b>{forecast.data.current.cloud_cover}%</b></span>
+                    <span>Solar radiation <b>{Math.round(forecast.data.current.shortwave_radiation)} W/m²</b></span>
                   </div>
                   <div className="weather-days">
-                    {forecast.data.daily.time.slice(0, 3).map((date, index) => (
+                    {forecast.data.daily.time.slice(0, 7).map((date, index) => (
                       <div key={date}>
                         <strong>{index === 0 ? 'Today' : new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })}</strong>
                         <span>{weatherDescription(forecast.data!.daily.weather_code[index])}</span>
                         <small>{Math.round(forecast.data!.daily.temperature_2m_max[index])}° / {Math.round(forecast.data!.daily.temperature_2m_min[index])}°</small>
                         <small>{forecast.data!.daily.precipitation_probability_max[index]}% rain</small>
+                        <small>{forecast.data!.daily.precipitation_sum[index].toFixed(1)} mm · {forecast.data!.daily.cloud_cover_mean[index]}% clouds</small>
+                        <small>{Math.round(forecast.data!.daily.shortwave_radiation_sum[index])} Wh/m² solar</small>
                       </div>
                     ))}
                   </div>
                 </>
               ) : null}
+              {forecast?.historyLoading ? (
+                <p className="quiet-state weather-history-state">Loading hourly historical weather…</p>
+              ) : forecast?.history ? (
+                <details className="weather-history">
+                  <summary>Hourly history · {forecast.history.hourly.time[0]?.slice(0, 10) ?? 'recent day'}</summary>
+                  <div className="weather-history-grid">
+                    {forecast.history.hourly.time.map((time, index) => (
+                      <div key={time}>
+                        <strong>{time.slice(-5)}</strong>
+                        <span>{Math.round(forecast.history!.hourly.temperature_2m[index])}°C</span>
+                        <small>{forecast.history!.hourly.precipitation[index]} mm rain</small>
+                        <small>{forecast.history!.hourly.cloud_cover[index]}% clouds</small>
+                        <small>{Math.round(forecast.history!.hourly.shortwave_radiation[index])} W/m² solar</small>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : forecast?.historyError ? (
+                <p className="form-message error-message weather-history-state" role="alert">{forecast.historyError}</p>
+              ) : null}
             </article>
           )
         })}
       </div>
-      <p className="weather-attribution">Forecast by Open-Meteo. Weather is an estimate for the saved pond location.</p>
+      <p className="weather-attribution">Forecast and historical data by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>. History is shown for seven days ago to allow for archive data availability; both are estimates for the saved pond location.</p>
     </section>
   )
 }

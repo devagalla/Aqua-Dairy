@@ -1,0 +1,11 @@
+{
+  "classes": [
+    "BG",
+    "BG_WSSV",
+    "Healthy",
+    "WSSV"
+  ],
+  "imgsz": 320,
+  "confidence_threshold": 0.3,
+  "test_macro_f1": 0.9305003642687412
+}

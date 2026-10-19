@@ -9,3 +9,7 @@
 5. Run `npm install`, then `npm run dev`.
 
 Use `npm test` to run the unit tests and `npm run build` to verify a production build.
+
+## Shrimp photo screening and pond weather
+
+The protected Shrimp health page runs the trained ONNX image classifier in the visitor's browser. The model file and four-class labels are in `public/models/`; photos are not uploaded or saved. The result is an initial visual screening only, not a diagnosis. Weather cards use Open-Meteo's forecast API for a seven-day outlook and its archive API for hourly weather from seven days ago. Both require saved pond coordinates.

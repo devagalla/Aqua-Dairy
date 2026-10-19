@@ -19,6 +19,7 @@ type Overview = {
 }
 
 const shortcuts = [
+  { href: '/health', title: 'Shrimp photo check', copy: 'Screen a photo on this device.', glyph: '✳', tint: 'violet' },
   { href: '/water', title: 'Water quality', copy: 'Check what your pond is telling you.', glyph: '◌', tint: 'aqua' },
   { href: '/feed', title: 'Feed log', copy: 'Keep daily feedings on track.', glyph: '◈', tint: 'green' },
   { href: '/growth', title: 'Growth samples', copy: 'Follow weight gain over time.', glyph: '↗', tint: 'violet' },

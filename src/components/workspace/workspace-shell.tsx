@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase/client'
 const links = [
   { href: '/dashboard', label: 'Overview', glyph: '⌂' },
   { href: '/ponds', label: 'Ponds & cycles', glyph: '◉' },
+  { href: '/health', label: 'Shrimp health', glyph: '✳' },
   { href: '/water', label: 'Water quality', glyph: '◌' },
   { href: '/feed', label: 'Feed log', glyph: '◈' },
   { href: '/growth', label: 'Growth', glyph: '↗' },
