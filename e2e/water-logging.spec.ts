@@ -1,6 +1,21 @@
 import { test, expect } from '@playwright/test'
 import { TEST_USERS, TEST_FARM, TEST_POND, TEST_CYCLE } from './fixtures/test-data'
 
+// Helper to interact with Radix Select (role="combobox")
+async function selectRadixOption(page: import('@playwright/test').Page, labelSelector: string, optionIndex: number) {
+  const combobox = page.locator('[role="combobox"]:has-text("Pond")')
+  await combobox.click()
+  // Wait for options to appear in the portal
+  await page.waitForSelector('[role="option"]', { timeout: 5000 })
+  const options = page.locator('[role="option"]')
+  const count = await options.count()
+  if (count > optionIndex) {
+    await options.nth(optionIndex).click()
+  } else if (count > 0) {
+    await options.nth(0).click()
+  }
+}
+
 test.describe.configure({ retries: 0 })
 
 test.describe('Water Logging & Advisor Feedback', () => {
@@ -8,31 +23,26 @@ test.describe('Water Logging & Advisor Feedback', () => {
     await page.goto('/water')
 
     // Wait for form to load and advisor rules to fetch
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
+    // The pond selector uses Radix Select (button with role="combobox")
+    await expect(page.locator('[role="combobox"]:has-text("Pond")')).toBeVisible({ timeout: 10000 })
 
-    // Select a pond (first available)
-    const pondOptions = page.locator('select[name=pond_id] option')
-    await expect(pondOptions.first()).toBeVisible()
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-
-    // Select culture cycle
-    await expect(page.locator('select[name=culture_cycle_id]')).toBeVisible()
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    // Select a pond using Radix Select interaction
+    await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     // Fill water parameters - test values that trigger different advisor statuses
     // pH 8.5 = HIGH (critical - red) | DO 3.2 = LOW (critical - red)
     await page.fill('input[name=ph]', '8.5')
     await page.fill('input[name=do_mg_l]', '3.2')
     await page.fill('input[name=temperature_c]', '32')
-    await page.fill('input[name=salinity_ppt]', '25')
+    await page.fill('input[name=salinity_pps]', '25')
     await page.fill('input[name=ammonia_mg_l]', '0.5')
     await page.fill('input[name=nitrite_mg_l]', '0.3')
 
     // Wait for advisor feedback to render (debounced)
     await page.waitForTimeout(500)
 
-    // Verify critical status indicators appear (red)
-    const criticalIndicators = page.locator('[data-water-status="critical"], .status-critical, [class*="critical"]')
+    // Verify critical status indicators appear (red) - uses .status-red class
+    const criticalIndicators = page.locator('.water-reading-status.status-red, .status-red[role="status"]')
     await expect(criticalIndicators.first()).toBeVisible({ timeout: 5000 })
 
     // Save the reading
@@ -44,56 +54,53 @@ test.describe('Water Logging & Advisor Feedback', () => {
 
   test('Water form shows optimal (green) status for ideal parameters', async ({ page }) => {
     await page.goto('/water')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
+    await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     // Ideal parameters: pH 7.8-8.2, DO 5-7, Temp 28-30, Salinity 15-25
     await page.fill('input[name=ph]', '8.0')
     await page.fill('input[name=do_mg_l]', '6.0')
     await page.fill('input[name=temperature_c]', '29')
-    await page.fill('input[name=salinity_ppt]', '20')
+    await page.fill('input[name=salinity_pps]', '20')
     await page.fill('input[name=ammonia_mg_l]', '0.05')
     await page.fill('input[name=nitrite_mg_l]', '0.05')
 
     await page.waitForTimeout(500)
 
-    // Verify optimal/green status indicators
-    const optimalIndicators = page.locator('[data-water-status="optimal"], .status-optimal, [class*="optimal"]')
+    // Verify optimal/green status indicators - uses .status-green class
+    const optimalIndicators = page.locator('.water-reading-status.status-green, .status-green[role="status"]')
     await expect(optimalIndicators.first()).toBeVisible({ timeout: 5000 })
   })
 
   test('Water form shows warning (yellow) status for borderline parameters', async ({ page }) => {
     await page.goto('/water')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
+    await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     // Borderline: pH 8.3 (slightly high), DO 4.5 (low but not critical)
     await page.fill('input[name=ph]', '8.3')
     await page.fill('input[name=do_mg_l]', '4.5')
     await page.fill('input[name=temperature_c]', '31')
-    await page.fill('input[name=salinity_ppt]', '28')
+    await page.fill('input[name=salinity_pps]', '28')
     await page.fill('input[name=ammonia_mg_l]', '0.2')
     await page.fill('input[name=nitrite_mg_l]', '0.15')
 
     await page.waitForTimeout(500)
 
-    // Verify warning/yellow status indicators
-    const warningIndicators = page.locator('[data-water-status="warning"], .status-warning, [class*="warning"]')
+    // Verify warning/yellow status indicators - uses .status-yellow class
+    const warningIndicators = page.locator('.water-reading-status.status-yellow, .status-yellow[role="status"]')
     await expect(warningIndicators.first()).toBeVisible({ timeout: 5000 })
   })
 
   test('Water reading persists and appears in history', async ({ page }) => {
     await page.goto('/water')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
+    await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     await page.fill('input[name=ph]', '7.9')
     await page.fill('input[name=do_mg_l]', '5.8')
     await page.fill('input[name=temperature_c]', '28')
-    await page.fill('input[name=salinity_ppt]', '18')
+    await page.fill('input[name=salinity_pps]', '18')
     await page.fill('input[name=ammonia_mg_l]', '0.02')
     await page.fill('input[name=nitrite_mg_l]', '0.02')
 
@@ -129,14 +136,13 @@ test.describe('Offline Queue & Sync', () => {
 
   test('Queues water reading when offline and syncs when online', async ({ page }) => {
     await page.goto('/water')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
+    await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     await page.fill('input[name=ph]', '7.5')
     await page.fill('input[name=do_mg_l]', '5.5')
     await page.fill('input[name=temperature_c]', '27')
-    await page.fill('input[name=salinity_ppt]', '15')
+    await page.fill('input[name=salinity_pps]', '15')
     await page.fill('input[name=ammonia_mg_l]', '0.01')
     await page.fill('input[name=nitrite_mg_l]', '0.01')
 
@@ -185,9 +191,8 @@ test.describe('Navigation & Core Flows', () => {
 
   test('Feed logging works with feed tray observation', async ({ page }) => {
     await page.goto('/feed')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
+    await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     await page.fill('input[name=feed_type]', 'CP 35%')
     await page.fill('input[name=amount_kg]', '25')
@@ -199,9 +204,8 @@ test.describe('Navigation & Core Flows', () => {
 
   test('Growth sampling works with biomass calculation', async ({ page }) => {
     await page.goto('/growth')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
+    await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     await page.fill('input[name=sample_count]', '50')
     await page.fill('input[name=total_weight_g]', '1250')
@@ -213,9 +217,15 @@ test.describe('Navigation & Core Flows', () => {
 
   test('Expense logging works', async ({ page }) => {
     await page.goto('/expenses')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
-    await page.selectOption('select[name=pond_id]', { index: 1 })
-    await page.selectOption('select[name=culture_cycle_id]', { index: 1 })
+    // Expense form has a different structure - check for either pond combobox or farm combobox
+    const pondCombobox = page.locator('label:has-text("Pond") >> [role="combobox"]')
+    const farmCombobox = page.locator('label:has-text("Farm") >> [role="combobox"]')
+    
+    if (await pondCombobox.isVisible({ timeout: 5000 })) {
+      await selectRadixOption(page, 'label:has-text("Pond")', 1)
+    } else if (await farmCombobox.isVisible({ timeout: 5000 })) {
+      await selectRadixOption(page, 'label:has-text("Farm")', 1)
+    }
 
     await page.fill('input[name=category]', 'Feed')
     await page.fill('input[name=amount]', '15000')
@@ -256,7 +266,7 @@ test.describe('Mobile Responsive', () => {
 
   test('Water form usable on mobile', async ({ page }) => {
     await page.goto('/water')
-    await expect(page.locator('select[name=pond_id]')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
 
     // Form fields should be appropriately sized for touch
     const phInput = page.locator('input[name=ph]')

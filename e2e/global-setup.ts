@@ -74,94 +74,153 @@ async function globalSetup(config: FullConfig) {
   // Create test farm, pond, and cycle for the test user
   console.log('🏞️  Creating test farm, pond, and cycle...')
 
-  // Create farm
-  const { data: farm, error: farmError } = await supabaseAdmin
-    .from('farms')
-    .insert({
-      name: 'E2E Test Farm',
-      locality: 'Bhimavaram',
-      district: 'West Godavari',
-      state: 'Andhra Pradesh',
-      owner_id: userId,
+  // Try to use the database function first (handles RLS and constraints properly)
+  let farmData = null
+  let farmError = null
+
+  try {
+    const result = await supabaseAdmin.rpc('create_initial_farm', {
+      farm_name_input: 'E2E Test Farm',
+      region_input: 'West Godavari, Andhra Pradesh',
+      pond_name_input: 'Test Pond 1',
+      area_acres_input: 1.5,
+      seed_stocked_input: 60000,
+      stocking_date_input: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
+      pl_input: '10',
+      target_harvest_days_input: 120,
+      locality_input: 'Bhimavaram',
+      latitude_input: 16.5449,
+      longitude_input: 81.5212,
     })
-    .select('id')
-    .single()
+    farmData = result.data
+    farmError = result.error
+  } catch (err) {
+    farmError = err
+  }
 
   if (farmError) {
-    console.log('⚠️  Farm may already exist or error:', farmError.message)
-    // Try to get existing farm
+    // Function might not exist in remote DB, fall back to manual creation
+    console.log('⚠️  Farm function not available, creating manually:', farmError.message || farmError)
+    
+    // Check if farm already exists for this user
     const { data: existingFarm } = await supabaseAdmin
       .from('farms')
       .select('id')
       .eq('owner_id', userId)
       .single()
-    if (existingFarm) {
-      console.log('✅ Using existing farm')
-      // @ts-ignore
-      farm = existingFarm
-    }
-  } else {
-    console.log('✅ Test farm created:', farm?.id)
-  }
 
-  if (farm?.id) {
-    // Create pond
-    const { data: pond, error: pondError } = await supabaseAdmin
-      .from('ponds')
-      .insert({
-        farm_id: farm.id,
-        name: 'Test Pond 1',
-        area_ha: 1.5,
-        depth_m: 1.2,
-        locality: 'Bhimavaram',
-        latitude: 16.5449,
-        longitude: 81.5212,
-      })
-      .select('id')
-      .single()
+    let farmId = existingFarm?.id
 
-    if (pondError) {
-      console.log('⚠️  Pond may already exist or error:', pondError.message)
-    } else {
-      console.log('✅ Test pond created:', pond?.id)
-
-      // Create culture cycle
-      const { data: cycle, error: cycleError } = await supabaseAdmin
-        .from('culture_cycles')
+    if (!farmId) {
+      // Create farm manually
+      const { data: newFarm, error: createFarmError } = await supabaseAdmin
+        .from('farms')
         .insert({
-          pond_id: pond.id,
-          species: 'Litopenaeus vannamei',
-          stocking_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
-          stocking_density: 60,
-          target_harvest_days: 120,
-          status: 'active',
+          name: 'E2E Test Farm',
+          region: 'West Godavari, Andhra Pradesh',
+          owner_id: userId,
         })
         .select('id')
         .single()
 
-      if (cycleError) {
-        console.log('⚠️  Cycle may already exist or error:', cycleError.message)
+      if (createFarmError) {
+        console.log('⚠️  Farm creation error:', createFarmError.message)
       } else {
-        console.log('✅ Test culture cycle created:', cycle?.id)
+        farmId = newFarm?.id
+        console.log('✅ Test farm created:', farmId)
+      }
+    } else {
+      console.log('✅ Using existing farm:', farmId)
+    }
+
+    if (farmId) {
+      // Create farm_member record (role must be 'Farmer', 'Manager', or 'Admin' per check constraint)
+      const { error: memberError } = await supabaseAdmin
+        .from('farm_members')
+        .upsert({
+          farm_id: farmId,
+          user_id: userId,
+          role: 'Farmer',
+        })
+        .select()
+        .single()
+
+      if (memberError) {
+        console.log('⚠️  Farm member may already exist or error:', memberError.message)
+      } else {
+        console.log('✅ Farm member record created/updated')
+      }
+
+      // Check for existing pond
+      const { data: existingPond } = await supabaseAdmin
+        .from('ponds')
+        .select('id')
+        .eq('farm_id', farmId)
+        .single()
+
+      let pondId = existingPond?.id
+
+      if (!pondId) {
+        // Create pond manually (no depth_m column in schema)
+        const { data: newPond, error: createPondError } = await supabaseAdmin
+          .from('ponds')
+          .insert({
+            farm_id: farmId,
+            name: 'Test Pond 1',
+            area_acres: 1.5,
+            locality: 'Bhimavaram',
+            latitude: 16.5449,
+            longitude: 81.5212,
+          })
+          .select('id')
+          .single()
+
+        if (createPondError) {
+          console.log('⚠️  Pond creation error:', createPondError.message)
+        } else {
+          pondId = newPond?.id
+          console.log('✅ Test pond created:', pondId)
+        }
+      } else {
+        console.log('✅ Using existing pond:', pondId)
+      }
+
+      if (pondId) {
+        // Check for existing active cycle
+        const { data: existingCycle } = await supabaseAdmin
+          .from('culture_cycles')
+          .select('id')
+          .eq('pond_id', pondId)
+          .eq('status', 'active')
+          .single()
+
+        if (!existingCycle) {
+          // Create culture cycle manually (no species column in schema)
+          const { data: newCycle, error: createCycleError } = await supabaseAdmin
+            .from('culture_cycles')
+            .insert({
+              pond_id: pondId,
+              stocking_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
+              seed_stocked: 60000,
+              pl: '10',
+              target_harvest_days: 120,
+              status: 'active',
+            })
+            .select('id')
+            .single()
+
+          if (createCycleError) {
+            console.log('⚠️  Cycle creation error:', createCycleError.message)
+          } else {
+            console.log('✅ Test culture cycle created:', newCycle?.id)
+          }
+        } else {
+          console.log('✅ Using existing culture cycle:', existingCycle.id)
+        }
       }
     }
-
-    // Add farm_member record
-    const { error: memberError } = await supabaseAdmin
-      .from('farm_members')
-      .upsert({
-        farm_id: farm.id,
-        user_id: userId,
-        role: 'owner',
-      })
-      .select()
-      .single()
-
-    if (memberError) {
-      console.log('⚠️  Farm member may already exist or error:', memberError.message)
-    } else {
-      console.log('✅ Farm member record created')
-    }
+  } else {
+    console.log('✅ Test farm, pond, and culture cycle created via function:', farmData)
   }
 
   console.log('✅ Global setup complete')
