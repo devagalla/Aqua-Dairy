@@ -87,9 +87,105 @@ function toProbabilities(values: ArrayLike<number>) {
   return exponents.map((value) => value / denominator)
 }
 
+/**
+ * OOD Detection using entropy, energy, and top-2 margin
+ * Filters out non-shrimp images without re-training
+ */
+function performOODDetection(probabilities: number[]) {
+  const sorted = [...probabilities].sort((a, b) => b - a)
+  const top1 = sorted[0]
+  const top2 = sorted[1] || 0
+  
+  const margin = top1 - top2
+  if (top1 < 0.95 || margin < 0.40) {
+    return {
+      isOOD: true,
+      message: 'Uncertain diagnosis. Ensure the shrimp is clearly visible in natural light.'
+    }
+  }
+  
+  const entropy = -probabilities.reduce((sum, p) => {
+    return sum + (p > 0 ? p * Math.log2(p) : 0)
+  }, 0)
+  
+  const maxEntropy = Math.log2(probabilities.length)
+  const normalizedEntropy = entropy / maxEntropy
+  
+  if (normalizedEntropy > 0.7) {
+    return {
+      isOOD: true,
+      message: 'Image may not contain shrimp. Please ensure the shrimp is clearly visible and centered.'
+    }
+  }
+  
+  const energy = -Math.log(probabilities.reduce((sum, p) => sum + Math.exp(p), 0))
+  
+  if (energy < -5.0) {
+    return {
+      isOOD: true,
+      message: 'Image quality is too low. Please use better lighting and focus.'
+    }
+  }
+  
+  return { isOOD: false }
+}
+
+/**
+ * Image quality checks before model inference
+ */
+async function checkImageQuality(bitmap: ImageBitmap): Promise<{ valid: boolean; message: string }> {
+  const canvas = document.createElement('canvas')
+  const size = Math.min(bitmap.width, bitmap.height, 640)
+  canvas.width = size
+  canvas.height = size
+  
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return { valid: false, message: 'Could not analyze image quality' }
+  
+  const cropSize = Math.min(bitmap.width, bitmap.height)
+  const cropX = (bitmap.width - cropSize) / 2
+  const cropY = (bitmap.height - cropSize) / 2
+  ctx.drawImage(bitmap, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
+  
+  const imageData = ctx.getImageData(0, 0, size, size)
+  const data = imageData.data
+  
+  let brightness = 0
+  let shrimpLikePixels = 0
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    
+    brightness += (r + g + b) / 3
+    
+    const isShrimpLike = r > 100 && g > 80 && b < r && b < g * 1.5
+    if (isShrimpLike) shrimpLikePixels++
+  }
+  
+  brightness = brightness / (data.length / 4) / 255
+  
+  if (brightness < 0.25 || brightness > 0.8) {
+    return { valid: false, message: 'Poor lighting. Please use natural light for better results.' }
+  }
+  
+  const shrimpRatio = shrimpLikePixels / (data.length / 4)
+  if (shrimpRatio < 0.03) {
+    return { valid: false, message: 'No shrimp detected. Please center the shrimp in frame.' }
+  }
+  
+  return { valid: true, message: '' }
+}
+
 async function classifyImage(file: File): Promise<Prediction[]> {
   const bitmap = await createImageBitmap(file)
   try {
+    const qualityCheck = await checkImageQuality(bitmap)
+    if (!qualityCheck.valid) {
+      throw new Error(qualityCheck.message)
+    }
+
     const canvas = document.createElement('canvas')
     canvas.width = IMAGE_SIZE
     canvas.height = IMAGE_SIZE
@@ -118,7 +214,14 @@ async function classifyImage(file: File): Promise<Prediction[]> {
     const output = result[session.outputNames[0]]
     if (!output || !('data' in output)) throw new Error('The model did not return a classification result.')
 
-    return toProbabilities(output.data as ArrayLike<number>)
+    const probabilities = toProbabilities(output.data as ArrayLike<number>)
+    
+    const oodCheck = performOODDetection(probabilities)
+    if (oodCheck.isOOD) {
+      throw new Error(oodCheck.message)
+    }
+
+    return probabilities
       .map((confidence, index) => ({ label: CLASS_NAMES[index], confidence }))
       .sort((left, right) => right.confidence - left.confidence)
   } finally {
@@ -128,17 +231,73 @@ async function classifyImage(file: File): Promise<Prediction[]> {
 
 export function ShrimpHealthScreening() {
   const inputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [predictions, setPredictions] = useState<Prediction[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [modelReady, setModelReady] = useState(false)
+  const [cameraActive, setCameraActive] = useState(false)
+  const [stream, setStream] = useState<MediaStream | null>(null)
 
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop())
+      }
     }
-  }, [previewUrl])
+  }, [previewUrl, stream])
+
+  async function startCamera() {
+    try {
+      setError('')
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      })
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream
+        await videoRef.current.play()
+      }
+      setStream(mediaStream)
+      setCameraActive(true)
+    } catch (err) {
+      setError('Camera access denied or not available. Please use file upload instead.')
+    }
+  }
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop())
+      setStream(null)
+    }
+    setCameraActive(false)
+  }
+
+  async function captureFromCamera() {
+    if (!videoRef.current || !canvasRef.current) return
+    
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const context = canvas.getContext('2d')
+    if (!context) return
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    
+    canvas.toBlob(async (blob) => {
+      if (!blob) return
+      const file = new File([blob], 'shrimp-capture.jpg', { type: 'image/jpeg' })
+      await analyze(file)
+      stopCamera()
+    }, 'image/jpeg', 0.9)
+  }
 
   async function analyze(file: File | undefined) {
     if (!file) return
@@ -184,27 +343,65 @@ export function ShrimpHealthScreening() {
       </p>
       <p className="telugu-subtitle" lang="te">స్పష్టమైన రొయ్యల ఫోటోను ఎంచుకోండి. ఈ మోడల్ ఆరోగ్యకరమైన, బ్లాక్ గిల్, వైట్ స్పాట్ లక్షణాల కోసం ప్రాథమికంగా పరిశీలిస్తుంది.</p>
 
-      <input
-        ref={inputRef}
-        className="health-image-input"
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        aria-label="Choose a shrimp photo"
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0]
-          event.currentTarget.value = ''
-          void analyze(file)
-        }}
-      />
-      <Button
-        type="button"
-        className="button-primary"
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-      >
-        {busy ? 'Checking image on this device…' : previewUrl ? 'Choose another photo' : 'Choose a shrimp photo'}
-        <span aria-hidden="true">↑</span>
-      </Button>
+      {!cameraActive ? (
+        <>
+          <input
+            ref={inputRef}
+            className="health-image-input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            aria-label="Choose a shrimp photo"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              void analyze(file)
+            }}
+          />
+          <div className="health-upload-buttons">
+            <Button
+              type="button"
+              className="button-primary"
+              onClick={() => inputRef.current?.click()}
+              disabled={busy}
+            >
+              {busy ? 'Checking image on this device…' : previewUrl ? 'Choose another photo' : 'Choose a shrimp photo'}
+              <span aria-hidden="true">↑</span>
+            </Button>
+            <Button
+              type="button"
+              className="button-secondary"
+              onClick={startCamera}
+              disabled={busy}
+            >
+              Use Camera
+              <span aria-hidden="true">📷</span>
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div className="camera-viewfinder">
+          <div className="camera-overlay">
+            <video ref={videoRef} className="camera-video" autoPlay playsInline muted />
+            <div className="viewfinder-guide">
+              <div className="guide-box">
+                <span className="guide-text">Center shrimp head & carapace</span>
+              </div>
+            </div>
+            <div className="camera-controls">
+              <Button type="button" className="button-primary" onClick={captureFromCamera} disabled={busy}>
+                Capture
+              </Button>
+              <Button type="button" className="button-secondary" onClick={stopCamera} disabled={busy}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+          <p className="health-camera-hint">
+            Center the shrimp's head and carapace within the box. Use natural light.
+          </p>
+        </div>
+      )}
       <span className="health-file-hint">JPEG, PNG, or WebP · up to 12 MB. Your photo is processed in this browser and is not uploaded.</span>
 
       {error && <p className="form-message error-message" role="alert">{error}</p>}
