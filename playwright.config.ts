@@ -9,6 +9,10 @@ const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_S
 const testEmail = process.env.E2E_TEST_EMAIL || 'test-farmer@aquadairy.local'
 const testPassword = process.env.E2E_TEST_PASSWORD || 'TestPass123!'
 
+// Set in process.env so imported modules (global-setup, auth.setup) can see it
+process.env.SUPABASE_SECRET_KEY = serviceRoleKey
+process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,

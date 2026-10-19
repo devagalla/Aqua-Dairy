@@ -14,8 +14,7 @@ export default function PondLogPage() {
       </div>
 
       <div className="card-surface">
-        <h3>Pond Log Workspace</h3>
-        <p>Pond log overview coming soon. This tab will aggregate water quality, feed, and growth data for active cycles with visual trend indicators.</p>
+        <GrowthTracker />
       </div>
     </div>
   )

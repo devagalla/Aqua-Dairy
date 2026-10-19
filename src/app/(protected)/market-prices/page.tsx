@@ -1,5 +1,7 @@
 'use client'
 
+import MarketPriceTicker from '@/components/MarketPriceTicker'
+
 export default function MarketPricesPage() {
   return (
     <div className="page-stack">
@@ -14,8 +16,7 @@ export default function MarketPricesPage() {
       </div>
 
       <div className="card-surface">
-        <h3>Market Prices Workspace</h3>
-        <p>Market price tracking coming soon. This tab will display price entries, trend indicators, and harvest decision support based on size and market demand.</p>
+        <MarketPriceTicker />
       </div>
     </div>
   )

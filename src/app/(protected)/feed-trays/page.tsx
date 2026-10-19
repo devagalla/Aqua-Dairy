@@ -6,11 +6,31 @@ import { evaluateFeedDecision } from '@/utils/feedDecision'
 
 export default function FeedTraysPage() {
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
+  const [records, setRecords] = useState([])
 
   useEffect(() => {
+    const saved = localStorage.getItem('feedRecords')
+    if (saved) {
+      setRecords(JSON.parse(saved))
+    }
     setLoading(false)
   }, [])
+
+  if (loading) {
+    return (
+      <div className="page-stack">
+        <div className="page-heading animate-in">
+          <div>
+            <span className="eyebrow">FEED &amp; CHECK TRAYS</span>
+            <h1>Daily feeding &amp; tray checks</h1>
+            <p>Record feed and check tray observations. Intelligent feed adjustments are calculated in real time.</p>
+          </div>
+          <span className="heading-orbit" aria-hidden="true">◈</span>
+        </div>
+        <p className="quiet-state">Loading…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="page-stack">
@@ -23,15 +43,45 @@ export default function FeedTraysPage() {
         <span className="heading-orbit" aria-hidden="true">◈</span>
       </div>
 
-      {loading ? (
-        <p className="quiet-state">Loading…</p>
-      ) : (
-        <div className="card-surface">
-          <h3>Feed &amp; Trays workspace</h3>
-          <p>This tab is under construction. The interactive feed logging form with tray check sliders and feed decision calculator will be connected here.</p>
-          <p>Utilities used: <code>evaluateFeedDecision</code>, <code>calculateAverageLeftover</code>, <code>queueOfflineRecord</code>.</p>
-        </div>
-      )}
+      <div className="card-surface">
+        <h3>Feed &amp; Trays Workspace</h3>
+        {records.length === 0 ? (
+          <p className="text-center py-4 text-gray-600">No feed records yet. Add your first observation above.</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto mb-4">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-gray-300">
+                    <th className="text-left p-3 font-semibold">Time</th>
+                    <th className="text-left p-3 font-semibold">Tray</th>
+                    <th className="text-left p-3 font-semibold">Adjustment</th>
+                    <th className="text-left p-3 font-semibold">Recommendation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.slice(-10).reverse().map((record, index) => (
+                    <tr key={index} className="border-b border-gray-200">
+                      <td className="p-3 text-sm text-gray-600">
+                        {new Date(record.timestamp).toLocaleTimeString()}
+                      </td>
+                      <td className="p-3">{record.trayNumber}</td>
+                      <td className="p-3">
+                        <span className={record.feedAdjustmentPercent < 0 ? 'text-red-600' : record.feedAdjustmentPercent > 0 ? 'text-green-600' : 'text-gray-600'}>
+                          {record.feedAdjustmentPercent}%
+                        </span>
+                      </td>
+                      <td className="p-3 text-sm">{record.recommendation}</td>
+                    </tr>
+                  ))}
+                </table>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Showing last {Math.min(10, records.length)} of {records.length} records
+              </p>
+            </>
+        )}
+      </div>
     </div>
   )
 }
