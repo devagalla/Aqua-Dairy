@@ -26,27 +26,35 @@ export default function MarketPriceTicker() {
   useEffect(() => {
     const saved = localStorage.getItem('marketPrices')
     if (saved) {
+      setPrices(JSON.parse(saved))
+      // Check for staleness
       const parsed = JSON.parse(saved)
-      setPrices(parsed)
       const latestDate = new Date(Math.max(...parsed.map((p: PriceData) => new Date(p.date).getTime())))
       const daysDiff = (Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24)
       setIsStale(daysDiff > 3)
     } else {
-      const samplePrices: PriceData[] = COUNT_SIZES.map(count => ({
-        id: `${selectedRegion}-${count}`,
-        region: selectedRegion,
-        countSize: count,
-        pricePerKg: 350 + Math.random() * 100,
-        trend: ['up', 'stable', 'down'][Math.floor(Math.random() * 3)] as Trend,
-        date: new Date().toISOString().split('T')[0]
-      }))
-      setPrices(samplePrices)
+      // Generate sample prices for all regions
+      const allSamplePrices: PriceData[] = []
+      REGIONS.forEach(region => {
+        COUNT_SIZES.forEach(count => {
+          allSamplePrices.push({
+            id: `${region}-${count}`,
+            region: region,
+            countSize: count,
+            pricePerKg: 350 + Math.random() * 100,
+            trend: ['up', 'stable', 'down'][Math.floor(Math.random() * 3)] as Trend,
+            date: new Date().toISOString().split('T')[0]
+          })
+        })
+      })
+      setPrices(allSamplePrices)
+      localStorage.setItem('marketPrices', JSON.stringify(allSamplePrices))
     }
   }, [])
   
   const handlePriceUpdate = (countSize: CountSize, newPrice: number, trend: Trend, note?: string) => {
-    const updatedPrices = prices.map(p => 
-      p.countSize === countSize 
+    const updatedPrices = prices.map(p =>
+      (p.countSize === countSize && p.region === selectedRegion)
         ? { ...p, pricePerKg: newPrice, trend, date: new Date().toISOString().split('T')[0], note }
         : p
     )
