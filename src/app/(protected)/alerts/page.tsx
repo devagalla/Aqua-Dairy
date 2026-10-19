@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
 
 type AlertRecord = {
@@ -11,11 +12,13 @@ type AlertRecord = {
   action: string | null
   created_at: string
   water_log_id: string | null
+  acknowledged_at: string | null
 }
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -23,7 +26,7 @@ export default function AlertsPage() {
     async function load() {
       const { data, error: queryError } = await supabase
         .from('alert_log')
-        .select('id, severity, message, action, created_at, water_log_id')
+        .select('id, severity, message, action, created_at, water_log_id, acknowledged_at')
         .order('created_at', { ascending: false })
         .limit(30)
       if (cancelled) return
@@ -34,6 +37,39 @@ export default function AlertsPage() {
     void load()
     return () => { cancelled = true }
   }, [])
+
+  async function acknowledge(alert: AlertRecord) {
+    setAcknowledgingId(alert.id)
+    setError('')
+    const { data, error: updateError } = await supabase
+      .from('alert_log')
+      .update({ acknowledged_at: new Date().toISOString() })
+      .eq('id', alert.id)
+      .is('acknowledged_at', null)
+      .select('id, acknowledged_at')
+      .maybeSingle()
+
+    if (updateError) {
+      setError(`Could not acknowledge this alert: ${updateError.message}`)
+    } else if (data?.acknowledged_at) {
+      setAlerts((current) => current.map((item) =>
+        item.id === alert.id ? { ...item, acknowledged_at: data.acknowledged_at } : item,
+      ))
+    } else {
+      const { data: currentAlert, error: refreshError } = await supabase
+        .from('alert_log')
+        .select('acknowledged_at')
+        .eq('id', alert.id)
+        .maybeSingle()
+      if (refreshError) setError(`Could not verify the alert status: ${refreshError.message}`)
+      else if (currentAlert?.acknowledged_at) {
+        setAlerts((current) => current.map((item) =>
+          item.id === alert.id ? { ...item, acknowledged_at: currentAlert.acknowledged_at } : item,
+        ))
+      } else setError('The alert was not updated. Please try again.')
+    }
+    setAcknowledgingId(null)
+  }
 
   return (
     <div className="page-stack">
@@ -65,6 +101,18 @@ export default function AlertsPage() {
                   {alert.action && <p>Suggested action: {alert.action}</p>}
                 </div>
                 {alert.water_log_id && <Link href="/water" className="text-link">View water log <span aria-hidden="true">→</span></Link>}
+                {alert.acknowledged_at ? (
+                  <span className="alert-acknowledged" role="status">Acknowledged · {new Date(alert.acknowledged_at).toLocaleDateString()}</span>
+                ) : (
+                  <Button
+                    type="button"
+                    className="farm-add-toggle alert-acknowledge"
+                    disabled={acknowledgingId === alert.id}
+                    onClick={() => void acknowledge(alert)}
+                  >
+                    {acknowledgingId === alert.id ? 'Saving…' : 'Acknowledge'}
+                  </Button>
+                )}
               </li>
             ))}
           </ul>

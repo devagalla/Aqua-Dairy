@@ -23,6 +23,7 @@ type Cycle = {
   id: string
   pond_id: string
   stocking_date: string
+  target_harvest_days: number | null
   seed_stocked: number
   pl: string | null
   status: 'active' | 'completed'
@@ -49,7 +50,7 @@ export default function PondsPage() {
     const [farmResult, pondResult, cycleResult] = await Promise.all([
       supabase.from('farms').select('id, name, region').order('created_at'),
       supabase.from('ponds').select('id, name, area_acres, farm_id, locality, latitude, longitude, farms(name)').order('created_at'),
-      supabase.from('culture_cycles').select('id, pond_id, stocking_date, seed_stocked, pl, status, completed_at, ponds(name)').order('stocking_date', { ascending: false }),
+      supabase.from('culture_cycles').select('id, pond_id, stocking_date, target_harvest_days, seed_stocked, pl, status, completed_at, ponds(name)').order('stocking_date', { ascending: false }),
     ])
     const failed = [farmResult, pondResult, cycleResult].find((result) => result.error)
     if (failed?.error) setError(failed.error.message)
@@ -287,8 +288,28 @@ export default function PondsPage() {
                     <span className="pond-list-icon">◌</span>
                     <div><strong>{pond.name}</strong><span>{pond.farm?.name}{pond.area_acres ? ` · ${pond.area_acres} acres` : ''}{pond.locality ? ` · ${pond.locality}` : ''}</span></div>
                     <div className="pond-cycle-list">{pondCycles.length ? pondCycles.map((cycle) => (
-                      <div key={cycle.id} className="cycle-chip">
+                      <div key={cycle.id} className={`cycle-chip${cycle.status === 'active' && cycle.target_harvest_days ? ' cycle-chip-progress' : ''}`}>
                         <span>{cycle.status === 'active' ? 'Active' : 'Completed'} · PL {cycle.pl ?? '—'} · {cycle.seed_stocked.toLocaleString()} stocked · {cycle.stocking_date}{cycle.completed_at ? ` · ended ${cycle.completed_at}` : ''}</span>
+                        {cycle.status === 'active' && cycle.target_harvest_days && (() => {
+                          const start = Date.parse(`${cycle.stocking_date}T00:00:00Z`)
+                          const day = Math.max(0, Math.floor((Date.now() - start) / 86_400_000) + 1)
+                          const progress = Math.min(100, Math.round((day / cycle.target_harvest_days) * 100))
+                          return (
+                            <div className="cycle-progress">
+                              <div
+                                className="cycle-progress-track"
+                                role="progressbar"
+                                aria-label={`${pond.name} cycle progress`}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={progress}
+                              >
+                                <span style={{ width: `${progress}%` }} />
+                              </div>
+                              <small>Day {day} of {cycle.target_harvest_days} · {progress}% of target</small>
+                            </div>
+                          )
+                        })()}
                         {cycle.status === 'active' && <Button type="button" className="farm-add-toggle" disabled={saving} onClick={() => void completeCycle(cycle.id)}>Mark completed</Button>}
                       </div>
                     )) : <span className="quiet-state">No cycle yet</span>}</div>

@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { OFFLINE_QUEUE_EVENT, readQueuedRecords, syncQueuedRecords } from '@/lib/offline/queue'
 
 const links = [
   { href: '/dashboard', label: 'Overview', glyph: '⌂' },
@@ -20,14 +21,91 @@ const links = [
 export function WorkspaceShell({
   children,
   email,
+  userId,
 }: {
   children: ReactNode
   email: string
+  userId: string
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
+  const [isOnline, setIsOnline] = useState(true)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [failedCount, setFailedCount] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const [offlineError, setOfflineError] = useState('')
+  const [offlineStorageError, setOfflineStorageError] = useState('')
+  const [serviceWorkerError, setServiceWorkerError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    let syncingNow = false
+
+    const refreshQueue = async () => {
+      try {
+        const records = await readQueuedRecords(userId)
+        if (!cancelled) {
+          setPendingCount(records.length)
+          setFailedCount(records.filter((record) => record.status === 'failed').length)
+          setOfflineStorageError('')
+        }
+      } catch (caught) {
+        if (!cancelled) {
+          setOfflineStorageError(caught instanceof Error ? caught.message : 'Could not open offline record storage.')
+        }
+      }
+    }
+
+    const sync = async () => {
+      if (!navigator.onLine || syncingNow) return
+      syncingNow = true
+      setSyncing(true)
+      try {
+        await syncQueuedRecords(userId)
+        if (!cancelled) setOfflineError('')
+      } catch (caught) {
+        if (!cancelled) {
+          setOfflineError(caught instanceof Error ? caught.message : 'Could not sync saved records.')
+        }
+      } finally {
+        syncingNow = false
+        if (!cancelled) {
+          setSyncing(false)
+          await refreshQueue()
+        }
+      }
+    }
+
+    const handleOnline = () => {
+      setIsOnline(true)
+      void sync()
+    }
+    const handleOffline = () => setIsOnline(false)
+    const handleQueueChange = () => { void refreshQueue() }
+
+    setIsOnline(navigator.onLine)
+    void refreshQueue()
+    if (navigator.onLine) void sync()
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    window.addEventListener(OFFLINE_QUEUE_EVENT, handleQueueChange)
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker.register('/service-worker.js').catch((caught: unknown) => {
+        if (!cancelled) {
+          setServiceWorkerError(caught instanceof Error ? caught.message : 'Offline cache could not start.')
+        }
+      })
+    }
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, handleQueueChange)
+    }
+  }, [userId])
 
   async function signOut() {
     setSigningOut(true)
@@ -100,12 +178,28 @@ export function WorkspaceShell({
                 day: 'numeric',
               }).format(new Date())}
             </span>
+            <span className={`offline-sync-status${!isOnline ? ' is-offline' : failedCount ? ' has-failures' : ''}`} role="status" aria-live="polite">
+              {!isOnline
+                ? `Offline · ${pendingCount} saved on this device`
+                : syncing
+                  ? 'Syncing saved records…'
+                  : failedCount
+                    ? `${failedCount} record${failedCount === 1 ? '' : 's'} need a retry`
+                    : pendingCount
+                      ? `${pendingCount} record${pendingCount === 1 ? '' : 's'} waiting to sync`
+                      : 'All records synced'}
+            </span>
           </div>
           <Link href="/ponds" className="topbar-setup">
             <span aria-hidden="true">＋</span> Ponds &amp; cycles
           </Link>
         </header>
         <main className="workspace-content">{children}</main>
+        {(offlineError || offlineStorageError || serviceWorkerError) && (
+          <p className="offline-sync-error" role="alert">
+            {offlineError || offlineStorageError || `Offline page caching could not start: ${serviceWorkerError}`}
+          </p>
+        )}
       </div>
       <nav className="mobile-workspace-nav" aria-label="Farm management">
         {links.slice(0, 5).map((link) => (

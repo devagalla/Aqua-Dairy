@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { evaluateRules, WaterSchema } from '@/utils/validation'
 import { supabaseServer } from '@/lib/supabase/server'
 
@@ -27,9 +28,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Please sign in to save water logs.' }, { status: 401 })
   }
 
-  const { data, error } = await supabase
+  const waterLogId = result.data.id ?? randomUUID()
+  const { data: insertedLog, error } = await supabase
     .from('water_logs')
-    .insert({
+    .upsert({
+      id: waterLogId,
       cycle_id: result.data.cycle_id,
       logged_at: result.data.logged_at,
       temperature_c: result.data.temperature_c,
@@ -42,25 +45,48 @@ export async function POST(req: NextRequest) {
       transparency_lux: result.data.transparency_lux,
       comment: result.data.comment,
       created_at: new Date().toISOString(),
-    })
+    }, { onConflict: 'id', ignoreDuplicates: true })
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const alerts = await evaluateRules(result.data, supabase)
+  let data = insertedLog
+  if (!data) {
+    const { data: existingLog, error: lookupError } = await supabase
+      .from('water_logs')
+      .select('*')
+      .eq('id', waterLogId)
+      .single()
+    if (lookupError) {
+      return NextResponse.json({ error: lookupError.message }, { status: 500 })
+    }
+    data = existingLog
+  }
+
+  let alerts: Awaited<ReturnType<typeof evaluateRules>>
+  try {
+    alerts = await evaluateRules(result.data, supabase)
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : 'Advisor rules could not be evaluated.'
+    return NextResponse.json({
+      ...data,
+      alert_warning: `Water reading saved, but alert evaluation failed: ${message}`,
+    }, { status: 201 })
+  }
   let alertWarning: string | null = null
   if (alerts.length > 0) {
-    const { error: alertError } = await supabase.from('alert_log').insert(
+    const { error: alertError } = await supabase.from('alert_log').upsert(
       alerts.map((alert) => ({
         rule_id: alert.rule_id,
-        water_log_id: data.id,
+        water_log_id: waterLogId,
         severity: alert.severity,
         message: alert.message,
         action: alert.action,
       })),
+      { onConflict: 'rule_id,water_log_id', ignoreDuplicates: true },
     )
 
     if (alertError) {

@@ -256,9 +256,10 @@ textarea:focus-visible {
 .profile-button:hover .profile-copy span { color: var(--sea); }
 .workspace-main { min-height: 100vh; margin-left: 232px; }
 .workspace-topbar { position: sticky; z-index: 3; top: 0; display: flex; height: 66px; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(224,232,221,.8); background: rgba(247,248,240,.9); padding: 0 clamp(22px, 5vw, 66px); backdrop-filter: blur(12px); }
-.workspace-topbar > div { display: flex; align-items: center; gap: 14px; }
+.workspace-topbar > div { display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 14px; }
 .topbar-eyebrow { color: #91a196; font-size: 8px; font-weight: 800; letter-spacing: .12em; }
 .topbar-date { color: #61776c; font-size: 11px; }
+.workspace-topbar .offline-sync-status { grid-column: 1 / -1; margin-top: 0; }
 .topbar-setup { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #d7e4d6; border-radius: 6px; background: #fbfcf8; padding: 9px 12px; color: var(--sea); font-size: 10px; font-weight: 800; }
 .topbar-setup:hover { transform: translateY(-1px); border-color: #9dc5a7; background: white; }
 .topbar-setup span { font-size: 15px; }
@@ -296,8 +297,17 @@ textarea:focus-visible {
 .field input[type="number"] { appearance: textfield; }
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .water-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.water-reading-status { display: flex; align-items: center; gap: 6px; color: #70847a; font-size: 9px; line-height: 1.4; }
+.water-reading-status > span { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #68a17a; }
+.water-reading-status.status-yellow { color: #9a7437; }
+.water-reading-status.status-yellow > span { background: #d6a54f; }
+.water-reading-status.status-red { color: #a44d44; }
+.water-reading-status.status-red > span { background: #c96458; }
 .record-form .button-primary { cursor: pointer; font-family: inherit; }
 .submit-button { width: 100%; min-height: 45px; margin-top: 2px; }
+.offline-sync-status { display: block; margin-top: 5px; color: #668b71; font-size: 9px; }
+.offline-sync-status.is-offline, .offline-sync-status.has-failures { color: #a44d44; }
+.offline-sync-error { position: fixed; z-index: 50; right: 18px; bottom: 80px; max-width: min(420px, calc(100vw - 36px)); margin: 0; border: 1px solid #edc9c0; border-radius: 6px; background: #fff8f5; padding: 11px 14px; color: #a44d44; font-size: 10px; box-shadow: 0 8px 24px #38241e12; }
 .form-message { border-radius: 5px; padding: 10px 12px; font-size: 11px; line-height: 1.6; }
 .error-message { border: 1px solid #efd1c7; background: #fff4ef; color: #a54e3d; }
 .success-message { border: 1px solid #d6e8d5; background: #eff7ed; color: #437c59; }
@@ -314,6 +324,10 @@ textarea:focus-visible {
 .journal-copy strong { color: #48655a; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
 .journal-copy span { color: #839289; font-size: 9px; line-height: 1.5; }
 .journal-value { max-width: 190px; color: #31776d; font-size: 10px; font-weight: 800; line-height: 1.5; text-align: right; overflow-wrap: anywhere; }
+.journal-sync-state { grid-column: 2 / -1; color: #748c7c; font-size: 9px; line-height: 1.5; }
+.journal-sync-state.sync-failed { color: #a44d44; }
+.journal-sync-state.sync-syncing { color: #9a7437; }
+.journal-retry { justify-self: end; }
 .journal-details { grid-column: 2 / -1; color: #5f7c6d; font-size: 9px; }
 .journal-details summary { width: fit-content; color: #31776d; font-weight: 700; cursor: pointer; }
 .journal-details dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 9px 16px; margin: 10px 0 2px; border-left: 2px solid #dce9da; padding: 3px 0 3px 11px; }
@@ -478,6 +492,11 @@ textarea:focus-visible {
 .pond-list-item > div:nth-child(2) span { color: #92a096; font-size: 9px; }
 .pond-cycle-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .cycle-chip { border: 1px solid #e0eadb; border-radius: 99px; background: #f7f9f2; padding: 6px 9px; color: #718a78; font-size: 8px; }
+.cycle-chip-progress { display: grid; min-width: 220px; gap: 8px; border-radius: 9px; }
+.cycle-progress { display: grid; gap: 5px; }
+.cycle-progress-track { overflow: hidden; height: 5px; border-radius: 99px; background: #e4ecdf; }
+.cycle-progress-track > span { display: block; height: 100%; border-radius: inherit; background: #5e9d81; transition: width .2s ease-out; }
+.cycle-progress small { color: #829289; font-size: 8px; }
 .alert-list-card { padding: 24px; }
 .compact-empty { min-height: 300px; align-items: center; text-align: center; }
 .compact-empty .text-link { margin-top: 2px; }
@@ -489,6 +508,8 @@ textarea:focus-visible {
 .severity-green { background: #6ca779; box-shadow: 0 0 0 5px #edf5e9; }
 .alert-item h2 { margin: 7px 0 4px; color: #3d5c51; font-family: Georgia, serif; font-size: 16px; font-weight: 500; }
 .alert-item p { margin: 0; color: #87958c; font-size: 10px; }
+.alert-acknowledge { justify-self: end; }
+.alert-acknowledged { color: #718a78; font-size: 9px; text-align: right; }
 
 @media (max-width: 1050px) {
   .landing-hero { padding-right: 7vw; padding-left: 7vw; }
@@ -528,7 +549,7 @@ textarea:focus-visible {
   .auth-brand { left: 20px; }
   .workspace-sidebar { display: none; }
   .workspace-main { margin-left: 0; }
-  .workspace-topbar { height: 58px; padding: 0 18px; }
+  .workspace-topbar { height: auto; min-height: 58px; padding: 7px 18px; }
   .topbar-eyebrow { display: none; }
   .workspace-content { padding: 25px 17px 95px; }
   .mobile-workspace-nav { position: fixed; z-index: 8; right: 0; bottom: 0; left: 0; display: flex; min-height: 63px; align-items: center; justify-content: space-around; border-top: 1px solid #e1e9dd; background: rgba(255,254,249,.96); padding: 4px 5px max(4px, env(safe-area-inset-bottom)); backdrop-filter: blur(14px); }
@@ -581,7 +602,7 @@ textarea:focus-visible {
   .hero-buttons { align-items: flex-start; flex-direction: column; gap: 10px; }
   .field-grid, .water-field-grid { grid-template-columns: 1fr; }
   .alert-item { grid-template-columns: 9px 1fr; }
-  .alert-item > .text-link { grid-column: 2; }
+  .alert-item > .text-link, .alert-item > .alert-acknowledge, .alert-item > .alert-acknowledged { grid-column: 2; justify-self: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

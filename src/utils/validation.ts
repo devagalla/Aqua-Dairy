@@ -7,6 +7,7 @@ const optionalNullableNumber = z.preprocess(
 )
 
 export const WaterSchema = z.object({
+  id: z.string().uuid().optional(),
   cycle_id: z.string().uuid(),
   logged_at: z
     .string()

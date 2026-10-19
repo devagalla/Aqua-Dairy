@@ -8,5 +8,5 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   if (error || !data.user) {
     redirect('/auth/signin');
   }
-  return <WorkspaceShell email={data.user.email ?? ''}>{children}</WorkspaceShell>;
+  return <WorkspaceShell email={data.user.email ?? ''} userId={data.user.id}>{children}</WorkspaceShell>;
 }

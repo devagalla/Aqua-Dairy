@@ -4,7 +4,21 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { TeluguHint } from '@/components/ui/telugu-hint'
+import {
+  OFFLINE_QUEUE_EVENT,
+  cacheRecordOptions,
+  isNetworkFailure,
+  queueOfflineRecord,
+  readCachedRecordOptions,
+  readQueuedRecords,
+  removeQueuedRecord,
+  retryQueuedRecord,
+  syncQueuedRecords,
+  type OfflineTable,
+  type QueuedRecord,
+} from '@/lib/offline/queue'
 import { supabase } from '@/lib/supabase/client'
+import { getWaterReadingStatus, type WaterAdvisorRule } from '@/utils/water-status'
 
 type RecordKind = 'water' | 'feed' | 'growth' | 'expenses'
 type FarmOption = { id: string; name: string }
@@ -92,11 +106,15 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
   const [cycles, setCycles] = useState<CycleOption[]>([])
   const [ponds, setPonds] = useState<PondOption[]>([])
   const [records, setRecords] = useState<RecentRecord[]>([])
+  const [userId, setUserId] = useState('')
+  const [sessionReady, setSessionReady] = useState(false)
   const [farmId, setFarmId] = useState('')
   const [cycleId, setCycleId] = useState('')
   const [expenseScope, setExpenseScope] = useState<'farm' | 'pond'>('farm')
   const [transactionType, setTransactionType] = useState<'expense' | 'income'>('expense')
   const [feedEntryMode, setFeedEntryMode] = useState<'single' | 'daily_summary'>('single')
+  const [waterRules, setWaterRules] = useState<WaterAdvisorRule[]>([])
+  const [waterRulesError, setWaterRulesError] = useState('')
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -107,21 +125,51 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
   const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null)
 
   const loadRecords = useCallback(async (from = 0) => {
+    let queued: QueuedRecord[] = []
+    if (userId) {
+      try {
+        queued = await readQueuedRecords(userId, page.table as OfflineTable)
+      } catch (caught) {
+        setError(caught instanceof Error ? `Offline record storage is unavailable: ${caught.message}` : 'Offline record storage is unavailable.')
+      }
+    }
+    const localRows = queued.map((item) => ({
+      ...item.data,
+      id: item.id,
+      [page.dateColumn]: item.data[page.dateColumn] ?? item.queuedAt,
+      ...(item.table === 'water_logs' ? { ph: item.data.ph ?? item.data.pH ?? null } : {}),
+      _offline_status: item.status,
+      _offline_error: item.lastError,
+    })) as RecentRecord[]
     const result = await supabase
       .from(page.table)
       .select('*')
       .order(page.dateColumn, { ascending: false })
-      .range(from, from + HISTORY_PAGE_SIZE)
+      .range(Math.max(0, from - localRows.length), Math.max(0, from - localRows.length) + HISTORY_PAGE_SIZE)
     if (result.error) {
-      setError(result.error.message)
+      if (from === 0) setRecords(localRows)
+      setHasMoreRecords(false)
+      setError(localRows.length > 0 ? '' : result.error.message)
       return false
     }
-    const rows = (result.data ?? []) as RecentRecord[]
-    setHasMoreRecords(rows.length > HISTORY_PAGE_SIZE)
-    const visibleRows = rows.slice(0, HISTORY_PAGE_SIZE)
-    setRecords((current) => from > 0 ? [...current, ...visibleRows] : visibleRows)
+    const serverRows = ((result.data ?? []) as RecentRecord[]).slice(0, HISTORY_PAGE_SIZE)
+    const rows = [...localRows, ...serverRows]
+      .filter((record, index, all) => all.findIndex((candidate) => candidate.id === record.id) === index)
+      .sort((left, right) =>
+        new Date(String(right[page.dateColumn])).getTime() -
+        new Date(String(left[page.dateColumn])).getTime(),
+      )
+    setHasMoreRecords(((result.data ?? []) as RecentRecord[]).length > HISTORY_PAGE_SIZE)
+    setRecords((current) => from > 0
+      ? [...current.filter((record) => record._offline_status), ...current.filter((record) => !record._offline_status), ...serverRows]
+          .filter((record, index, all) => all.findIndex((candidate) => candidate.id === record.id) === index)
+          .sort((left, right) =>
+            new Date(String(right[page.dateColumn])).getTime() -
+            new Date(String(left[page.dateColumn])).getTime(),
+          )
+      : rows)
     return true
-  }, [page.dateColumn, page.table])
+  }, [page.dateColumn, page.table, userId])
 
   const loadFinanceSummary = useCallback(async () => {
     const { data, error: summaryError } = await supabase.rpc('get_expense_dashboard')
@@ -141,6 +189,22 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
 
   useEffect(() => {
     let cancelled = false
+    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (cancelled) return
+      if (sessionError) setError(`Could not load your saved session: ${sessionError.message}`)
+      else setUserId(data.session?.user.id ?? '')
+      setSessionReady(true)
+    }).catch((caught: unknown) => {
+      if (!cancelled) {
+        setError(caught instanceof Error ? caught.message : 'Could not load your saved session.')
+        setSessionReady(true)
+      }
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
     async function loadOptions() {
       setLoading(true)
       const [farmResult, cycleResult] = await Promise.all([
@@ -152,10 +216,19 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
           .order('stocking_date', { ascending: false }),
       ])
       if (cancelled) return
-      if (farmResult.error) setError(farmResult.error.message)
-      if (cycleResult.error) setError(cycleResult.error.message)
-      const farmRows = (farmResult.data ?? []) as FarmOption[]
-      const cycleRows = (cycleResult.data ?? []).map((row) => {
+      if (kind === 'water') {
+        const { data, error: ruleError } = await supabase
+          .from('advisor_rules')
+          .select('parameter, min_threshold, max_threshold, severity, message_en')
+          .eq('enabled', true)
+        if (ruleError) setWaterRulesError(ruleError.message)
+        else {
+          setWaterRules((data ?? []) as WaterAdvisorRule[])
+          setWaterRulesError('')
+        }
+      }
+      let farmRows = (farmResult.data ?? []) as FarmOption[]
+      let cycleRows = (cycleResult.data ?? []).map((row) => {
         const relation = row.ponds as
           | { id?: string; name?: string; farm_id?: string; farms?: { name?: string } }
           | null
@@ -169,6 +242,37 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
           },
         }
       }) as CycleOption[]
+      const optionsError = farmResult.error ?? cycleResult.error
+      if (optionsError) {
+        if ((!navigator.onLine || isNetworkFailure(optionsError)) && userId) {
+          try {
+            const cachedOptions = await readCachedRecordOptions(userId)
+            if (cachedOptions) {
+              farmRows = cachedOptions.farms
+              cycleRows = cachedOptions.cycles as CycleOption[]
+              setError('Offline mode: using the farm and cycle details saved on this device.')
+            } else {
+              setError('You are offline and no farm details are saved on this device yet. Reconnect once to prepare offline logging.')
+            }
+          } catch (caught) {
+            setError(caught instanceof Error ? caught.message : 'Could not read your saved farm details.')
+          }
+        } else {
+          setError(optionsError.message)
+        }
+      } else {
+        setError('')
+        if (userId) {
+          try {
+            await cacheRecordOptions(userId, {
+              farms: farmRows,
+              cycles: cycleRows.map((cycle) => ({ ...cycle })),
+            })
+          } catch (caught) {
+            setError(caught instanceof Error ? `Offline setup could not be saved: ${caught.message}` : 'Offline setup could not be saved.')
+          }
+        }
+      }
       const pondRows = new Map<string, PondOption>()
       for (const cycle of cycleRows) {
         if (!cycle.pond_id || pondRows.has(cycle.pond_id)) continue
@@ -192,6 +296,15 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     return () => {
       cancelled = true
     }
+  }, [kind, loadFinanceSummary, loadRecords, userId])
+
+  useEffect(() => {
+    const refresh = () => {
+      void loadRecords()
+      if (kind === 'expenses') void loadFinanceSummary()
+    }
+    window.addEventListener(OFFLINE_QUEUE_EVENT, refresh)
+    return () => window.removeEventListener(OFFLINE_QUEUE_EVENT, refresh)
   }, [kind, loadFinanceSummary, loadRecords])
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -215,9 +328,11 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     const timestamp = (name: string) => new Date(get(name)).toISOString()
     let table = page.table
     let payload: Record<string, string | number | null>
+    const recordId = crypto.randomUUID()
 
     if (kind === 'water') {
       const formData = {
+        id: recordId,
         cycle_id: cycleId,
         logged_at: timestamp('logged_at'),
         temperature_c: numberOrNull('temperature_c'),
@@ -231,6 +346,13 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         comment: get('comment') || null,
       }
       try {
+        if (!navigator.onLine) {
+          await queueOfflineRecord(userId, 'water_logs', formData)
+          setMessage('Water log saved on this device. It will sync when you are back online.')
+          formElement.reset()
+          await loadRecords()
+          return
+        }
         const response = await fetch('/api/water', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -243,7 +365,20 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         formElement.reset()
         await loadRecords()
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Could not save water log.')
+        if (!navigator.onLine || isNetworkFailure(caught)) {
+          try {
+            await queueOfflineRecord(userId, 'water_logs', formData)
+            setMessage('Connection was lost. Water log saved on this device and will sync when you are back online.')
+            formElement.reset()
+            await loadRecords()
+          } catch (queueError) {
+            setError(queueError instanceof Error
+              ? `Could not save the water log offline: ${queueError.message}`
+              : 'Could not save the water log offline.')
+          }
+        } else {
+          setError(caught instanceof Error ? caught.message : 'Could not save water log.')
+        }
       } finally {
         setSaving(false)
       }
@@ -283,8 +418,16 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
       table = 'expenses'
     }
 
+    payload.id = recordId
     try {
-      const { error: insertError } = await supabase.from(table).insert(payload)
+      if (!navigator.onLine) {
+        await queueOfflineRecord(userId, table as OfflineTable, payload)
+        setMessage('Entry saved on this device. It will sync when you are back online.')
+        formElement.reset()
+        await loadRecords()
+        return
+      }
+      const { error: insertError } = await supabase.from(table).upsert(payload, { onConflict: 'id' })
       if (insertError) throw insertError
       setMessage(
         kind === 'feed'
@@ -299,7 +442,20 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
       await loadRecords()
       if (kind === 'expenses') await loadFinanceSummary()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save this record.')
+      if (!navigator.onLine || isNetworkFailure(caught)) {
+        try {
+          await queueOfflineRecord(userId, table as OfflineTable, payload)
+          setMessage('Connection was lost. Entry saved on this device and will sync when you are back online.')
+          formElement.reset()
+          await loadRecords()
+        } catch (queueError) {
+          setError(queueError instanceof Error
+            ? `Could not save this record offline: ${queueError.message}`
+            : 'Could not save this record offline.')
+        }
+      } else {
+        setError(caught instanceof Error ? caught.message : 'Could not save this record.')
+      }
     } finally {
       setSaving(false)
     }
@@ -311,6 +467,12 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     setMessage('')
     setDeletingRecordId(record.id)
     try {
+      if (typeof record._offline_status === 'string') {
+        await removeQueuedRecord(userId, record.id)
+        setMessage('Pending entry removed from this device.')
+        await loadRecords()
+        return
+      }
       const { error: deleteError } = await supabase
         .from(page.table)
         .delete()
@@ -326,11 +488,27 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
     }
   }
 
+  async function retryOfflineRecord(record: RecentRecord) {
+    setError('')
+    setMessage('')
+    setDeletingRecordId(record.id)
+    try {
+      await retryQueuedRecord(userId, record.id)
+      await syncQueuedRecords(userId)
+      await loadRecords()
+      if (kind === 'expenses') await loadFinanceSummary()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not retry this record.')
+    } finally {
+      setDeletingRecordId(null)
+    }
+  }
+
   async function loadMoreRecords() {
     setError('')
     setLoadingMore(true)
     try {
-      await loadRecords(records.length)
+      await loadRecords(records.filter((record) => typeof record._offline_status !== 'string').length)
     } finally {
       setLoadingMore(false)
     }
@@ -414,7 +592,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
               </div>
               <span className="card-heading-dot" />
             </div>
-            {loading ? (
+            {loading || !sessionReady ? (
               <p className="quiet-state">Loading your ponds…</p>
             ) : (
               <form className="record-form" onSubmit={save}>
@@ -478,7 +656,12 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                     {selectedCycle && <small>This record will be linked to {selectedCycle.pond?.name ?? 'your selected pond'}.</small>}
                   </label>
                 )}
-                {kind === 'water' && <WaterFields dateTime={localDateTime()} />}
+                {kind === 'water' && (
+                  <>
+                    {waterRulesError && <p className="form-message error-message" role="status">Reading guidance is unavailable: {waterRulesError}</p>}
+                    <WaterFields dateTime={localDateTime()} rules={waterRules} />
+                  </>
+                )}
                 {kind === 'feed' && (
                   <>
                     <div className="field-grid">
@@ -579,6 +762,15 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                         : new Date(String(record[page.dateColumn])).toLocaleString()}</span>
                     </div>
                     <span className="journal-value">{recentValue(kind, record)}</span>
+                    {typeof record._offline_status === 'string' && (
+                      <span className={`journal-sync-state sync-${record._offline_status}`}>
+                        {record._offline_status === 'failed'
+                          ? `Sync failed${record._offline_error ? `: ${record._offline_error}` : ''}`
+                          : record._offline_status === 'syncing'
+                            ? 'Syncing…'
+                            : 'Saved on this device · waiting to sync'}
+                      </span>
+                    )}
                     <details className="journal-details">
                       <summary>Details</summary>
                       <dl>
@@ -590,6 +782,16 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                         ))}
                       </dl>
                     </details>
+                    {record._offline_status === 'failed' && (
+                      <Button
+                        type="button"
+                        className="farm-add-toggle journal-retry"
+                        onClick={() => void retryOfflineRecord(record)}
+                        disabled={deletingRecordId !== null}
+                      >
+                        {deletingRecordId === record.id ? 'Retrying…' : 'Retry sync'}
+                      </Button>
+                    )}
                     <button
                       type="button"
                       className="journal-delete"
@@ -619,7 +821,9 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
   )
 }
 
-function WaterFields({ dateTime }: { dateTime: string }) {
+function WaterFields({ dateTime, rules }: { dateTime: string; rules: WaterAdvisorRule[] }) {
+  const [values, setValues] = useState<Record<string, number | null>>({})
+
   return (
     <>
       <label className="field"><span>Reading time</span><input name="logged_at" type="datetime-local" defaultValue={dateTime} required /><TeluguHint>నీటి నమూనా తీసిన తేదీ, సమయం.</TeluguHint></label>
@@ -633,13 +837,34 @@ function WaterFields({ dateTime }: { dateTime: string }) {
           ['nitrite_mg_l', 'Nitrite', 'mg/L', '0.1', 'నీటిలో నైట్రైట్ స్థాయి; పరీక్ష కిట్ రీడింగ్ రాయండి.'],
           ['alkalinity_ppms', 'Alkalinity', 'ppm', '120', 'నీటి క్షారత్వం; పరీక్ష కిట్ చూపిన ppm విలువ.'],
           ['transparency_lux', 'Transparency', 'cm', '35', 'నీరు ఎంత స్పష్టంగా ఉందో సె.మీ.లో నమోదు చేయండి.'],
-        ].map(([name, label, unit, placeholder, hint]) => (
-          <label className="field" key={name}>
-            <span>{label} <small>{unit}</small></span>
-            <input name={name} type="number" step="0.01" placeholder={placeholder} />
-            <TeluguHint>{hint}</TeluguHint>
-          </label>
-        ))}
+        ].map(([name, label, unit, placeholder, hint]) => {
+          const status = getWaterReadingStatus(name, values[name] ?? null, rules)
+          return (
+            <label className="field" key={name}>
+              <span>{label} <small>{unit}</small></span>
+              <input
+                name={name}
+                type="number"
+                step="0.01"
+                placeholder={placeholder}
+                onChange={(event) => {
+                  const rawValue = event.currentTarget.value
+                  setValues((current) => ({
+                    ...current,
+                    [name]: rawValue === '' ? null : Number(rawValue),
+                  }))
+                }}
+              />
+              <TeluguHint>{hint}</TeluguHint>
+              {status && (
+                <small className={`water-reading-status status-${status.level}`} role="status">
+                  <span aria-hidden="true" />
+                  {status.message}
+                </small>
+              )}
+            </label>
+          )
+        })}
       </div>
     </>
   )
