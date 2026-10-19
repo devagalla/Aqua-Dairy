@@ -8,15 +8,12 @@ import { supabase } from '@/lib/supabase/client'
 import { OFFLINE_QUEUE_EVENT, readQueuedRecords, syncQueuedRecords } from '@/lib/offline/queue'
 
 const links = [
-  { href: '/dashboard', label: 'Overview', glyph: '⌂' },
-  { href: '/ponds', label: 'Ponds & cycles', glyph: '◉' },
-  { href: '/health', label: 'Shrimp health', glyph: '✳' },
-  { href: '/water', label: 'Water quality', glyph: '◌' },
-  { href: '/feed', label: 'Feed log', glyph: '◈' },
-  { href: '/growth', label: 'Growth', glyph: '↗' },
-  { href: '/expenses', label: 'Expenses', glyph: '＄' },
-  { href: '/alerts', label: 'Alerts', glyph: '◇' },
+  { href: '/pond-log', label: 'Pond Log', glyph: '◉' },
+  { href: '/feed-trays', label: 'Feed & Trays', glyph: '◈' },
+  { href: '/market-prices', label: 'Market Prices', glyph: '＄' },
+  { href: '/health', label: 'Shrimp Health', glyph: '✳' },
 ]
+
 
 export function WorkspaceShell({
   children,
@@ -205,14 +202,14 @@ export function WorkspaceShell({
         )}
       </div>
       <nav className="mobile-workspace-nav" aria-label="Farm management">
-        {links.slice(0, 5).map((link) => (
+        {links.map((link) => (
           <Link
             key={link.href}
             href={link.href}
             className={pathname.startsWith(link.href) ? 'active' : ''}
           >
             <span aria-hidden="true">{link.glyph}</span>
-            {link.label === 'Water quality' ? 'Water' : link.label === 'Ponds & cycles' ? 'Ponds' : link.label}
+            {link.label}
           </Link>
         ))}
       </nav>

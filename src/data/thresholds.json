@@ -1,0 +1,38 @@
+{
+  "feedRateBands": {
+    "lessThan5": { "min": 5.5, "mid": 6.0, "max": 6.5 },
+    "5ToUnder10": { "min": 4.0, "mid": 4.5, "max": 5.0 },
+    "10ToUnder15": { "min": 3.2, "mid": 3.5, "max": 3.8 },
+    "15ToUnder20": { "min": 2.6, "mid": 2.8, "max": 3.0 },
+    "20AndUp": { "min": 2.0, "mid": 2.2, "max": 2.4 }
+  },
+  "trayAdjustment": {
+    "increase": { "condition": "L = 0", "adjustment": 0.05, "messageKey": "tray.increase" },
+    "maintain": { "condition": "0 < L <= 20", "adjustment": 0, "messageKey": "tray.maintain" },
+    "reduceSlight": { "condition": "20 < L <= 25", "adjustment": -0.1, "messageKey": "tray.reduceSlight" },
+    "cut": { "condition": "L > 25", "adjustment": -0.2, "messageKey": "tray.cut" },
+    "singleTrayThreshold": 50
+  },
+  "growth": {
+    "minSampleCount": 50,
+    "minDaysBetweenSamples": 5,
+    "stuntedAdgThresholdMultiplier": 0.7,
+    "stuntedAdgAbsoluteThreshold": 0.2,
+    "stuntedDocThreshold": 40
+  },
+  "price": {
+    "staleDaysThreshold": 3,
+    "countSizes": [30, 40, 60, 80, 100]
+  },
+  "validation": {
+    "areaMin": 0.1,
+    "densityMin": 1,
+    "densityMax": 200,
+    "docMin": 1,
+    "docMax": 200,
+    "abwMin": 0.1,
+    "abwMax": 60,
+    "survivalMin": 1,
+    "survivalMax": 100
+  }
+}

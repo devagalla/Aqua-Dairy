@@ -1,0 +1,15 @@
+[
+  { "doc": 1, "expected_abw_g": 0.01 },
+  { "doc": 10, "expected_abw_g": 0.2 },
+  { "doc": 20, "expected_abw_g": 0.8 },
+  { "doc": 30, "expected_abw_g": 2.5 },
+  { "doc": 40, "expected_abw_g": 5.0 },
+  { "doc": 50, "expected_abw_g": 8.0 },
+  { "doc": 60, "expected_abw_g": 11.5 },
+  { "doc": 70, "expected_abw_g": 15.0 },
+  { "doc": 80, "expected_abw_g": 18.5 },
+  { "doc": 90, "expected_abw_g": 22.0 },
+  { "doc": 100, "expected_abw_g": 25.5 },
+  { "doc": 110, "expected_abw_g": 28.5 },
+  { "doc": 120, "expected_abw_g": 31.0 }
+]

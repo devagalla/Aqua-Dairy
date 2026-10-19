@@ -10,6 +10,13 @@
 
 Use `npm test` to run the unit tests and `npm run build` to verify a production build.
 
+
+## Aqua Diary Reference Modules & Features (Built from Decompiled APK Analysis)
+- **Pond Log & Growth Tracker (`src/utils/growthMath.ts`)**: ADG calculation, stunted growth alerts (<0.15 g/day), actual FCR, and gross asset value estimation with Recharts benchmark curves.
+- **Shrimp Health & Feed Decision Engine (`src/logic/healthRules.ts`, `src/components/VisualWaterHealth.tsx`)**: Disease symptoms mapped to severity levels ('LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL') and feed reduction rules.
+- **Market Prices Board (`src/components/MarketPriceTicker.tsx`)**: Regional pricing (Bhimavaram, Nellore, Surat, Ongole, Kakinada) for count sizes 30 to 100, stale price warnings (>3 days), and trend indicators.
+- **Telugu Localization & Field Ergonomics**: Complete Telugu translations (`src/locales/te.json`), touch targets ≥56px, text ≥18px, high sunlight-readable contrast, and offline storage persistence.
+
 ## Shrimp photo screening and pond weather
 
 The protected Shrimp health page runs the trained ONNX image classifier in the visitor's browser. The model file and four-class labels are in `public/models/`; photos are not uploaded or saved. The result is an initial visual screening only, not a diagnosis. Weather cards use Open-Meteo's live current conditions and seven-day forecast, refreshed without browser caching, plus an hourly archive view for yesterday in the pond's local timezone. All weather requires saved pond coordinates.
