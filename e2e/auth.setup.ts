@@ -10,7 +10,11 @@ const authFile = '.auth/user.json'
 setup('authenticate as test user', async ({ page }) => {
   // Use Supabase Admin API to generate a magic link for the test user
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xyxqtpzdkgtpjbsybsms.supabase.co'
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '***REMOVED***'
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required')
+  }
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
