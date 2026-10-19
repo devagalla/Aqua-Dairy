@@ -146,23 +146,23 @@ function GrowthChart({
           <YAxis name="Mean Body Weight (g)" domain={[0, 'dataMax']} />
           <Tooltip />
           <Legend />
-          <Line 
-          type="monotone" 
-          dataKey="mbw" 
-          stroke="#3B82F6" 
-          strokeWidth={2} 
-          name="Actual MBW"
-        />
-        {benchmarks.length > 0 && (
-          <Line 
-            type="monotone" 
-            dataKey="benchmark" 
-            stroke="#10B981" 
-            strokeWidth={2} 
-            strokeDasharray="5 5"
-            name="Vannamei Benchmark"
+          <Line
+            type="monotone"
+            dataKey="mbw"
+            stroke="#3B82F6"
+            strokeWidth={2}
+            name="Actual MBW"
           />
-        )}
+          {benchmarks.length > 0 && (
+            <Line
+              type="monotone"
+              dataKey="benchmark"
+              stroke="#10B981"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              name="Vannamei Benchmark"
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>

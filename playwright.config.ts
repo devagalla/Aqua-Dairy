@@ -4,13 +4,15 @@ import { defineConfig, devices } from '@playwright/test'
 process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST = 'true'
 
 // Pass Supabase credentials to global setup and tests
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xyxqtpzdkgtpjbsybsms.supabase.co'
-const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5eHF0cHpka2d0cGpic3lic21zIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjI1Njg1OSwiZXhwIjoyMTA3ODMyODU5fQ.9biq4fWlT3PoXZq2ahFvIfZpsjeMk8iwfyKMEuMclkk'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co'
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const testEmail = process.env.E2E_TEST_EMAIL || 'test-farmer@aquadairy.local'
 const testPassword = process.env.E2E_TEST_PASSWORD || 'TestPass123!'
 
 // Set in process.env so imported modules (global-setup, auth.setup) can see it
-process.env.SUPABASE_SECRET_KEY = serviceRoleKey
+if (serviceRoleKey) {
+  process.env.SUPABASE_SECRET_KEY = serviceRoleKey
+}
 process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl
 
 export default defineConfig({
@@ -64,8 +66,7 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_PLAYWRIGHT_TEST: 'true',
       NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
-      SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
-      SUPABASE_SECRET_KEY: serviceRoleKey,
+      ...(serviceRoleKey && { SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey, SUPABASE_SECRET_KEY: serviceRoleKey }),
     },
   },
   expect: {
