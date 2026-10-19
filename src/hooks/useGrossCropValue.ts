@@ -17,7 +17,6 @@ interface PriceData {
 }
 
 const API_ENDPOINT = 'https://api.aquasangham.in/api/v1/prices'
-const REGIONS = ['Bhimavaram', 'Nellore', 'Ongole', 'Surat', 'Kakinada']
 
 export interface GrossCropValueResult {
   biomassKg: number

@@ -1,11 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
+
+interface FeedRecord {
+  timestamp: string
+  trayNumber: number
+  feedAdjustmentPercent: number
+  recommendation: string
+}
 
 export default function FeedTraysPage() {
   const [loading, setLoading] = useState(true)
-  const [records, setRecords] = useState([])
+  const [records, setRecords] = useState<FeedRecord[]>([])
 
   useEffect(() => {
     const saved = localStorage.getItem('feedRecords')

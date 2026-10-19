@@ -7,14 +7,6 @@ export interface SamplingRecord {
   survivalPercent: number
 }
 
-export interface CycleConfig {
-  pondName: string
-  pondId: string
-  stockingDate: string
-  seedCount: number
-  pondAreaAcres: number
-  targetHarvestCount?: number
-}
 
 /**
  * Calculates Average Daily Growth (ADG) in grams/day
@@ -40,8 +32,7 @@ export function calculateADG(
  */
 export function detectStuntedGrowth(
   adg: number | null,
-  currentDoc: number,
-  actualAbw: number
+  currentDoc: number
 ): { isStunted: boolean; message?: string } {
   if (adg === null) {
     return { isStunted: false }

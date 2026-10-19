@@ -10,11 +10,9 @@ import {
   abwToCountPerKg,
   calculateAbwFromSample,
   calculateAdg,
-  getExpectedAbw,
   checkStuntedGrowth,
 } from '../utils/biomassEstimator'
 import {
-  calculateAverageLeftover,
   evaluateFeedDecision,
 } from '../utils/feedDecision'
 

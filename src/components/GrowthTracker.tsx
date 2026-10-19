@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 import { calculateADG, detectStuntedGrowth, calculateBiomassKg } from '@/utils/growthMath'
-import benchmarks from '@/data/shrimpGrowthBenchmarks.json'
+import * as benchmarksData from '@/data/shrimpGrowthBenchmarks.json'
 
 interface Benchmark {
   doc: number
   expected_abw_g: number
 }
+const benchmarks: Benchmark[] = benchmarksData as Benchmark[]
 
 interface PondConfig {
   pondName: string
@@ -29,17 +30,30 @@ export default function GrowthTracker() {
   const [pondConfig, setPondConfig] = useState<PondConfig | null>(null)
   const [samplingRecords, setSamplingRecords] = useState<SamplingRecord[]>([])
 
-  // Calculate metrics
-  const latestRecord = samplingRecords[samplingRecords.length - 1]
-  const previousRecord = samplingRecords[samplingRecords.length - 2]
+  // Calculate metrics with memoization
+  const latestRecord = useMemo(() =>
+    samplingRecords[samplingRecords.length - 1],
+    [samplingRecords]
+  )
 
-  const adg = latestRecord && previousRecord 
-    ? calculateADG(latestRecord, previousRecord) 
-    : null
+  const previousRecord = useMemo(() =>
+    samplingRecords[samplingRecords.length - 2],
+    [samplingRecords]
+  )
 
-  const biomass = latestRecord && pondConfig
-    ? calculateBiomassKg(pondConfig.seedCount, latestRecord.survivalPercent, latestRecord.mbwGrams)
-    : 0
+  const adg = useMemo(() =>
+    latestRecord && previousRecord
+      ? calculateADG(latestRecord, previousRecord)
+      : null,
+    [latestRecord, previousRecord]
+  )
+
+  const biomass = useMemo(() =>
+    latestRecord && pondConfig
+      ? calculateBiomassKg(pondConfig.seedCount, latestRecord.survivalPercent, latestRecord.mbwGrams)
+      : 0,
+    [latestRecord, pondConfig]
+  )
 
   const handlePondConfigChange = (config: PondConfig) => {
     setPondConfig(config)
@@ -128,14 +142,17 @@ function GrowthChart({
     )
   }
 
-  const chartData = records.map((record) => {
-    const benchmark = benchmarks.find(b => b.doc === record.doc)
-    return {
-      doc: record.doc,
-      mbw: record.mbwGrams,
-      benchmark: benchmark ? benchmark.expected_abw_g : null
-    }
-  })
+  const chartData = useMemo(() =>
+    records.map((record) => {
+      const benchmark = benchmarks.find(b => b.doc === record.doc)
+      return {
+        doc: record.doc,
+        mbw: record.mbwGrams,
+        benchmark: benchmark ? benchmark.expected_abw_g : null
+      }
+    }),
+    [records, benchmarks]
+  )
 
   return (
     <div className="h-64">
@@ -379,28 +396,37 @@ function SamplingForm({
 }
 
 // Metrics Dashboard
-function MetricsDashboard({ 
-  pondConfig, 
-  latestRecord, 
-  adg, 
-  biomass 
-}: { 
+function MetricsDashboard({
+  pondConfig,
+  latestRecord,
+  adg,
+  biomass
+}: {
   pondConfig: PondConfig | null
   latestRecord: SamplingRecord | null
   adg: number | null
   biomass: number
 }) {
-  const fcr = latestRecord && pondConfig && biomass > 0
-    ? latestRecord.cumulativeFeedKg / biomass
-    : 0
+  const fcr = useMemo(() =>
+    latestRecord && pondConfig && biomass > 0
+      ? latestRecord.cumulativeFeedKg / biomass
+      : 0,
+    [latestRecord?.cumulativeFeedKg, biomass, pondConfig]
+  )
 
-  const gcvm = pondConfig && latestRecord
-    ? biomass * 350 // Assuming Rs 350/kg price - in reality this would come from market prices
-    : 0
+  const gcvm = useMemo(() =>
+    pondConfig && latestRecord
+      ? biomass * 350 // Assuming Rs 350/kg price - in reality this would come from market prices
+      : 0,
+    [biomass, pondConfig, latestRecord]
+  )
 
-  const stuntedCheck = adg !== null && latestRecord
-    ? detectStuntedGrowth(adg, latestRecord.doc, latestRecord.mbwGrams)
-    : null
+  const stuntedCheck = useMemo(() =>
+    adg !== null && latestRecord
+      ? detectStuntedGrowth(adg, latestRecord.doc)
+      : null,
+    [adg, latestRecord?.doc]
+  )
 
   return (
     <div className="grid gap-4">

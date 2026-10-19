@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import { TEST_USERS, TEST_FARM, TEST_POND, TEST_CYCLE } from './fixtures/test-data'
 
 test.describe.configure({ retries: 0 })
 

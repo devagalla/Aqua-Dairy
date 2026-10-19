@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { HEALTH_SYMPTOMS, evaluateHealthStatus, getSeverityColor, type Severity } from '../logic/healthRules'
+import { HEALTH_SYMPTOMS, evaluateHealthStatus, getSeverityColor, type Severity, type HealthStatus } from '../logic/healthRules'
 
 interface VisualWaterHealthProps {
-  onHealthStatusChange?: (status: any) => void
+  onHealthStatusChange?: (status: HealthStatus) => void
 }
 
 export default function VisualWaterHealth({ onHealthStatusChange }: VisualWaterHealthProps) {

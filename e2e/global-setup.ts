@@ -100,7 +100,7 @@ async function globalSetup(config: FullConfig) {
 
   if (farmError) {
     // Function might not exist in remote DB, fall back to manual creation
-    console.log('⚠️  Farm function not available, creating manually:', farmError.message || farmError)
+    console.log('⚠️  Farm function not available, creating manually:', (farmError as { message?: string }).message || farmError)
     
     // Check if farm already exists for this user
     const { data: existingFarm } = await supabaseAdmin
@@ -124,7 +124,7 @@ async function globalSetup(config: FullConfig) {
         .single()
 
       if (createFarmError) {
-        console.log('⚠️  Farm creation error:', createFarmError.message)
+        console.log('⚠️  Farm creation error:', (createFarmError as { message?: string }).message)
       } else {
         farmId = newFarm?.id
         console.log('✅ Test farm created:', farmId)
@@ -176,7 +176,7 @@ async function globalSetup(config: FullConfig) {
           .single()
 
         if (createPondError) {
-          console.log('⚠️  Pond creation error:', createPondError.message)
+          console.log('⚠️  Pond creation error:', (createPondError as { message?: string }).message)
         } else {
           pondId = newPond?.id
           console.log('✅ Test pond created:', pondId)
