@@ -54,7 +54,7 @@ test.describe('Water Logging & Advisor Feedback', () => {
 
   test('Water form shows optimal (green) status for ideal parameters', async ({ page }) => {
     await page.goto('/water')
-    await expect(page.locator('label:has-text("Pond") >> [role="combobox"]')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('[role="combobox"]:has-text("Pond")')).toBeVisible({ timeout: 10000 })
     await selectRadixOption(page, 'label:has-text("Pond")', 1)
 
     // Ideal parameters: pH 7.8-8.2, DO 5-7, Temp 28-30, Salinity 15-25
