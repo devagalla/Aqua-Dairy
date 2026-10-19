@@ -47,6 +47,18 @@ describe('WaterSchema validation', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts a client-generated UUID for idempotent offline sync', () => {
+    const valid = {
+      id: '123e4567-e89b-12d3-a456-426614174001',
+      cycle_id: '123e4567-e89b-12d3-a456-426614174000',
+      logged_at: new Date().toISOString(),
+      temperature_c: 28.5,
+    };
+    const result = WaterSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.id).toBe(valid.id);
+  });
+
   it('rejects invalid UUID', () => {
     const invalid = {
       cycle_id: 'not-a-uuid',

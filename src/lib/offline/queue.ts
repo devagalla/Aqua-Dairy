@@ -3,6 +3,12 @@ import { supabase } from '@/lib/supabase/client'
 export const OFFLINE_QUEUE_EVENT = 'aqua-dairy-offline-queue-change'
 const DATABASE_NAME = 'aqua-dairy-offline'
 const DATABASE_VERSION = 1
+const OFFLINE_TABLES = new Set<OfflineTable>([
+  'water_logs',
+  'feed_logs',
+  'growth_samples',
+  'expenses',
+])
 
 export type OfflineTable = 'water_logs' | 'feed_logs' | 'growth_samples' | 'expenses'
 export type QueueStatus = 'pending' | 'syncing' | 'failed'
@@ -40,6 +46,21 @@ type StoredOptions = {
   userId: string
   value: CachedRecordOptions
   savedAt: string
+}
+
+function isQueuedRecord(value: unknown): value is QueuedRecord {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Partial<QueuedRecord>
+  return typeof record.id === 'string' &&
+    typeof record.userId === 'string' &&
+    typeof record.table === 'string' &&
+    OFFLINE_TABLES.has(record.table as OfflineTable) &&
+    Boolean(record.data) &&
+    typeof record.data === 'object' &&
+    typeof record.queuedAt === 'string' &&
+    typeof record.retryCount === 'number' &&
+    ['pending', 'syncing', 'failed'].includes(String(record.status)) &&
+    (record.lastError === null || typeof record.lastError === 'string')
 }
 
 let databasePromise: Promise<IDBDatabase> | null = null
@@ -99,9 +120,17 @@ function announceQueueChange() {
 }
 
 export async function readQueuedRecords(userId: string, table?: OfflineTable): Promise<QueuedRecord[]> {
-  const records = await runTransaction('records', 'readonly', (store) => store.getAll())
+  const storedRecords = await runTransaction<unknown[]>('records', 'readonly', (store) => store.getAll())
+  if (!storedRecords.every(isQueuedRecord)) {
+    throw new Error('Offline storage contains an unreadable record. Keep this browser data and reconnect for support.')
+  }
+  const records = storedRecords
   return records
-    .filter((record) => record.userId === userId && (!table || record.table === table))
+    .filter((record) =>
+      record.userId === userId &&
+      OFFLINE_TABLES.has(record.table) &&
+      (!table || record.table === table),
+    )
     .sort((left, right) => right.queuedAt.localeCompare(left.queuedAt))
 }
 
@@ -169,7 +198,11 @@ export async function cacheRecordOptions(
 
 export async function readCachedRecordOptions(userId: string): Promise<CachedRecordOptions | null> {
   if (!userId) return null
-  const stored = await runTransaction('options', 'readonly', (store) => store.get(userId))
+  const stored = await runTransaction<StoredOptions | undefined>(
+    'options',
+    'readonly',
+    (store) => store.get(userId),
+  )
   return stored?.userId === userId ? stored.value : null
 }
 

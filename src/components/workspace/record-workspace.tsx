@@ -227,6 +227,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
           setWaterRulesError('')
         }
       }
+      if (cancelled) return
       let farmRows = (farmResult.data ?? []) as FarmOption[]
       let cycleRows = (cycleResult.data ?? []).map((row) => {
         const relation = row.ponds as
@@ -247,6 +248,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         if ((!navigator.onLine || isNetworkFailure(optionsError)) && userId) {
           try {
             const cachedOptions = await readCachedRecordOptions(userId)
+            if (cancelled) return
             if (cachedOptions) {
               farmRows = cachedOptions.farms
               cycleRows = cachedOptions.cycles as CycleOption[]
@@ -268,6 +270,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
               farms: farmRows,
               cycles: cycleRows.map((cycle) => ({ ...cycle })),
             })
+            if (cancelled) return
           } catch (caught) {
             setError(caught instanceof Error ? `Offline setup could not be saved: ${caught.message}` : 'Offline setup could not be saved.')
           }
@@ -368,7 +371,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
         if (!navigator.onLine || isNetworkFailure(caught)) {
           try {
             await queueOfflineRecord(userId, 'water_logs', formData)
-            setMessage('Connection was lost. Water log saved on this device and will sync when you are back online.')
+            setMessage('Connection was lost. Water log is saved locally and queued to sync.')
             formElement.reset()
             await loadRecords()
           } catch (queueError) {
@@ -445,7 +448,7 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
       if (!navigator.onLine || isNetworkFailure(caught)) {
         try {
           await queueOfflineRecord(userId, table as OfflineTable, payload)
-          setMessage('Connection was lost. Entry saved on this device and will sync when you are back online.')
+          setMessage('Connection was lost. Entry is saved locally and queued to sync.')
           formElement.reset()
           await loadRecords()
         } catch (queueError) {
@@ -753,7 +756,10 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
             ) : (
               <ul className="journal-list">
                 {records.map((record) => (
-                  <li key={String(record.id)} className="journal-row">
+                  <li
+                    key={String(record.id)}
+                    className={`journal-row${typeof record._offline_status === 'string' ? ' journal-row-pending' : ''}`}
+                  >
                     <span className="journal-dot" />
                     <div className="journal-copy">
                       <strong>{recentTitle(kind, record)}</strong>

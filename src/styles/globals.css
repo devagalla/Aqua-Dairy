@@ -327,7 +327,9 @@ textarea:focus-visible {
 .journal-sync-state { grid-column: 2 / -1; color: #748c7c; font-size: 9px; line-height: 1.5; }
 .journal-sync-state.sync-failed { color: #a44d44; }
 .journal-sync-state.sync-syncing { color: #9a7437; }
-.journal-retry { justify-self: end; }
+.journal-row-pending .journal-sync-state { grid-row: 2; }
+.journal-row-pending .journal-details { grid-row: 3; }
+.journal-retry { grid-column: 2 / -1; grid-row: 4; justify-self: end; }
 .journal-details { grid-column: 2 / -1; color: #5f7c6d; font-size: 9px; }
 .journal-details summary { width: fit-content; color: #31776d; font-weight: 700; cursor: pointer; }
 .journal-details dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 9px 16px; margin: 10px 0 2px; border-left: 2px solid #dce9da; padding: 3px 0 3px 11px; }
@@ -585,6 +587,9 @@ textarea:focus-visible {
   .journal-value { grid-column: 2; grid-row: 2; max-width: none; text-align: left; }
   .journal-delete { grid-column: 3; grid-row: 2; justify-self: end; }
   .journal-details { grid-column: 2 / -1; grid-row: 3; }
+  .journal-row-pending .journal-sync-state { grid-row: 3; }
+  .journal-row-pending .journal-details { grid-row: 4; }
+  .journal-row-pending .journal-retry { grid-column: 2 / -1; grid-row: 5; }
   .farm-manage-grid { grid-template-columns: 1fr; }
   .pond-list-item { grid-template-columns: 34px 1fr; }
   .pond-cycle-list { grid-column: 2; }

@@ -68,7 +68,19 @@ export async function POST(req: NextRequest) {
 
   let alerts: Awaited<ReturnType<typeof evaluateRules>>
   try {
-    alerts = await evaluateRules(result.data, supabase)
+    alerts = await evaluateRules({
+      cycle_id: data.cycle_id,
+      logged_at: data.logged_at,
+      temperature_c: data.temperature_c,
+      pH: data.ph,
+      do_mg_l: data.do_mg_l,
+      salinity_pps: data.salinity_pps,
+      ammonia_mg_l: data.ammonia_mg_l,
+      nitrite_mg_l: data.nitrite_mg_l,
+      alkalinity_ppms: data.alkalinity_ppms,
+      transparency_lux: data.transparency_lux,
+      comment: data.comment,
+    }, supabase)
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : 'Advisor rules could not be evaluated.'
     return NextResponse.json({

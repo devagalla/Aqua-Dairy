@@ -83,7 +83,10 @@ export function WorkspaceShell({
       void sync()
     }
     const handleOffline = () => setIsOnline(false)
-    const handleQueueChange = () => { void refreshQueue() }
+    const handleQueueChange = () => {
+      void refreshQueue()
+      if (navigator.onLine) void sync()
+    }
 
     setIsOnline(navigator.onLine)
     void refreshQueue()
