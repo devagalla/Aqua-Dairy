@@ -108,7 +108,7 @@ Discovered from reverse engineering:
 - AquaSangham: `https://api.aquasangham.in` and `https://www.aquasangham.in/api`
 - Backend: Firebase (`kcc-aquasangam`) + Supabase
 - Weather: Open-Meteo
-- Maps: Google Maps API Key `AIzaSyAV4XGkLWaDqtntHION4gATOtf4Jr7VWO0`
+- Maps: Google Maps API (key redacted for security)
 
 ## Next Steps
 The implementation is complete and ready for use. All phases are implemented with proper TypeScript typing, Recharts visualizations, and bilingual support for Telugu-speaking aquaculture farmers in Andhra/Telangana region.
