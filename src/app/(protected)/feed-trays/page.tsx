@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { evaluateFeedDecision } from '@/utils/feedDecision'
 
 export default function FeedTraysPage() {
   const [loading, setLoading] = useState(true)
@@ -74,12 +73,13 @@ export default function FeedTraysPage() {
                       <td className="p-3 text-sm">{record.recommendation}</td>
                     </tr>
                   ))}
-                </table>
-              </div>
+                </tbody>
+              </table>
               <p className="text-sm text-gray-500 mt-2">
                 Showing last {Math.min(10, records.length)} of {records.length} records
               </p>
-            </>
+            </div>
+          </>
         )}
       </div>
     </div>

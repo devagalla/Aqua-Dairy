@@ -1,5 +1,7 @@
 'use client'
 
+import GrowthTracker from '@/components/GrowthTracker'
+
 export default function PondLogPage() {
   return (
     <div className="page-stack">

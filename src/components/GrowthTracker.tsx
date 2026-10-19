@@ -1,9 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { ResponsiveLineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 import { calculateADG, detectStuntedGrowth, calculateBiomassKg } from '@/utils/growthMath'
 import benchmarks from '@/data/shrimpGrowthBenchmarks.json'
+
+interface Benchmark {
+  doc: number
+  expected_abw_g: number
+}
 
 interface PondConfig {
   pondName: string
@@ -89,7 +94,7 @@ export default function GrowthTracker() {
           <h3>Growth Chart</h3>
           <GrowthChart 
             records={samplingRecords} 
-            benchmarks={benchmarks.vannamei || []}
+            benchmarks={benchmarks || []}
           />
         </div>
 
@@ -113,7 +118,7 @@ function GrowthChart({
   benchmarks 
 }: { 
   records: SamplingRecord[]
-  benchmarks: any[]
+  benchmarks: Benchmark[]
 }) {
   if (records.length === 0) {
     return (
@@ -123,23 +128,25 @@ function GrowthChart({
     )
   }
 
-  const chartData = records.map((record, index) => ({
-    doc: record.doc,
-    mbw: record.mbwGrams,
-    ...(benchmarks[index] && {
-      benchmark: benchmarks[index].mbwGrams || 0
-    })
-  }))
+  const chartData = records.map((record) => {
+    const benchmark = benchmarks.find(b => b.doc === record.doc)
+    return {
+      doc: record.doc,
+      mbw: record.mbwGrams,
+      benchmark: benchmark ? benchmark.expected_abw_g : null
+    }
+  })
 
   return (
     <div className="h-64">
-      <ResponsiveLineChart data={chartData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="doc" type="number" name="Day of Culture" />
-        <YAxis type="number" name="Mean Body Weight (g)" domain={[0, 'dataMax']} />
-        <Tooltip />
-        <Legend />
-        <Line 
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="doc" name="Day of Culture" />
+          <YAxis name="Mean Body Weight (g)" domain={[0, 'dataMax']} />
+          <Tooltip />
+          <Legend />
+          <Line 
           type="monotone" 
           dataKey="mbw" 
           stroke="#3B82F6" 
@@ -156,7 +163,8 @@ function GrowthChart({
             name="Vannamei Benchmark"
           />
         )}
-      </ResponsiveLineChart>
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   )
 }
@@ -390,8 +398,19 @@ function MetricsDashboard({
     ? biomass * 350 // Assuming Rs 350/kg price - in reality this would come from market prices
     : 0
 
+  const stuntedCheck = adg !== null && latestRecord
+    ? detectStuntedGrowth(adg, latestRecord.doc, latestRecord.mbwGrams)
+    : null
+
   return (
     <div className="grid gap-4">
+      {stuntedCheck?.isStunted && (
+        <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+          <h4 className="font-semibold mb-2 text-red-800">⚠️ Stunted Growth Alert</h4>
+          <p className="text-sm text-red-700">{stuntedCheck.message}</p>
+        </div>
+      )}
+
       <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
         <h4 className="font-semibold mb-2">Estimated Biomass</h4>
         <p className="text-2xl font-bold text-blue-800">{biomass.toFixed(2)} kg</p>
