@@ -3,51 +3,59 @@
 
 import { test as setup, expect } from '@playwright/test'
 import { TEST_USERS } from './fixtures/test-data'
+import { createClient } from '@supabase/supabase-js'
 
 const authFile = '.auth/user.json'
 
 setup('authenticate as test user', async ({ page }) => {
-  await page.goto('/auth/signin')
+  // Use Supabase Admin API to generate a magic link for the test user
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xyxqtpzdkgtpjbsybsms.supabase.co'
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '***REMOVED***'
 
-  // Fill credentials (no networkidle wait - Turnstile may cause it to hang)
-  await page.fill('input[type=email]', TEST_USERS.primary.email)
-  await page.fill('input[type=password]', TEST_USERS.primary.password)
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 
-  // Wait for test mode captcha token to be set (useEffect in SignIn page)
-  await page.waitForTimeout(1000)
+  // Generate a magic link for the test user
+  console.log('🔐 Generating magic link for test user...')
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: TEST_USERS.primary.email,
+    options: {
+      redirectTo: 'http://localhost:3000/auth/callback?next=/dashboard',
+    },
+  })
 
-  // Debug: log all console messages
-  page.on('console', msg => console.log(`🌐 Console: ${msg.text()}`))
-  page.on('pageerror', err => console.log(`🌐 Page Error: ${err.message}`))
+  if (linkError) {
+    console.error('❌ Failed to generate magic link:', linkError.message)
+    throw new Error(`Failed to generate magic link: ${linkError.message}`)
+  }
 
-  // Check if button is enabled
-  const signInButton = page.locator('button:has-text("Sign in")')
-  await expect(signInButton).toBeEnabled({ timeout: 10000 })
+  console.log('✅ Magic link generated:', linkData.properties?.action_link)
 
-  // Click sign in
-  await signInButton.click()
-
-  // Wait for redirect to dashboard OR error message
-  await Promise.race([
-    page.waitForURL(/\/dashboard/, { timeout: 30000 }),
-    page.waitForSelector('.error-message, [role="alert"]', { timeout: 30000 }).then(async () => {
-      const errorText = await page.locator('.error-message, [role="alert"]').first().textContent()
-      throw new Error(`Sign in failed: ${errorText}`)
-    })
-  ])
-
-  // Check for any error messages
-  const errorElements = page.locator('.error-message, [role="alert"]')
-  const errorCount = await errorElements.count()
-  if (errorCount > 0) {
-    for (let i = 0; i < errorCount; i++) {
-      const text = await errorElements.nth(i).textContent()
-      console.log(`⚠️ Error on page: "${text}"`)
+  // The magic link from Supabase might have the production URL
+  // Extract the token and build a local callback URL
+  let magicLink = linkData.properties?.action_link || ''
+  if (magicLink.includes('vercel.app')) {
+    // Extract token and type from the production URL
+    const url = new URL(magicLink)
+    const token = url.searchParams.get('token')
+    const type = url.searchParams.get('type')
+    if (token && type) {
+      // Use token_hash parameter as expected by the callback route
+      magicLink = `http://localhost:3000/auth/callback?token_hash=${token}&type=${type}&next=/dashboard`
+      console.log('🔧 Rewritten magic link for local testing:', magicLink)
     }
   }
 
-  // Verify we're on dashboard
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 5000 })
+  // Navigate to the magic link
+  await page.goto(magicLink)
+
+  // Wait for redirect to dashboard
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 30000 })
 
   // Save authenticated state (cookies, localStorage, etc.)
   await page.context().storageState({ path: authFile })

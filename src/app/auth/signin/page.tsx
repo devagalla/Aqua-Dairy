@@ -10,6 +10,9 @@ import { supabase } from '@/lib/supabase/client'
 
 const isTestMode = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true'
 
+// Test mode: fixed captcha token
+const TEST_CAPTCHA_TOKEN = 'playwright-test-token-fixed'
+
 export default function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,15 +22,9 @@ export default function SignIn() {
   const [needsVerification, setNeedsVerification] = useState(false)
   const [resendNotice, setResendNotice] = useState('')
   const [resending, setResending] = useState(false)
-  const [captchaToken, setCaptchaToken] = useState('')
+  // In test mode, pre-set the captcha token so form can submit immediately
+  const [captchaToken, setCaptchaToken] = useState(isTestMode ? TEST_CAPTCHA_TOKEN : '')
   const captchaRef = useRef<TurnstileInstance>()
-
-  // Test mode: auto-set captcha token
-  useEffect(() => {
-    if (isTestMode) {
-      setCaptchaToken('playwright-test-token-' + Date.now())
-    }
-  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -53,7 +50,7 @@ export default function SignIn() {
     const { error: signinError } = await supabase.auth.signInWithPassword({
       email,
       password,
-      options: isTestMode ? {} : { captchaToken },
+      options: { captchaToken },
     })
     captchaRef.current?.reset()
     setCaptchaToken('')

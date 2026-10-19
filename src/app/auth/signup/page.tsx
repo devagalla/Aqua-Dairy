@@ -10,6 +10,9 @@ import { supabase } from '@/lib/supabase/client'
 
 const isTestMode = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true'
 
+// Test mode: fixed captcha token
+const TEST_CAPTCHA_TOKEN = 'playwright-test-token-fixed'
+
 export default function SignUp() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,15 +21,9 @@ export default function SignUp() {
   const [sent, setSent] = useState(false)
   const [resent, setResent] = useState(false)
   const [existingAccount, setExistingAccount] = useState(false)
-  const [captchaToken, setCaptchaToken] = useState('')
+  // In test mode, pre-set the captcha token so form can submit immediately
+  const [captchaToken, setCaptchaToken] = useState(isTestMode ? TEST_CAPTCHA_TOKEN : '')
   const captchaRef = useRef<TurnstileInstance>()
-
-  // Test mode: auto-set captcha token
-  useEffect(() => {
-    if (isTestMode) {
-      setCaptchaToken('playwright-test-token-' + Date.now())
-    }
-  }, [])
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -42,7 +39,7 @@ export default function SignUp() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-        ...(isTestMode ? {} : { captchaToken }),
+        captchaToken,
       },
     })
     captchaRef.current?.reset()
@@ -64,7 +61,6 @@ export default function SignUp() {
   }
 
   async function resendEmail() {
-    // In test mode, skip captcha validation
     if (!isTestMode && !captchaToken) {
       setError('Complete the security check before requesting another email.')
       return
@@ -76,7 +72,7 @@ export default function SignUp() {
       email,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-        ...(isTestMode ? {} : { captchaToken }),
+        captchaToken,
       },
     })
     captchaRef.current?.reset()
