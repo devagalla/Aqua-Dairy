@@ -138,43 +138,52 @@ async function checkImageQuality(bitmap: ImageBitmap): Promise<{ valid: boolean;
   const size = Math.min(bitmap.width, bitmap.height, 640)
   canvas.width = size
   canvas.height = size
-  
+
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return { valid: false, message: 'Could not analyze image quality' }
-  
+
   const cropSize = Math.min(bitmap.width, bitmap.height)
   const cropX = (bitmap.width - cropSize) / 2
   const cropY = (bitmap.height - cropSize) / 2
   ctx.drawImage(bitmap, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
-  
+
   const imageData = ctx.getImageData(0, 0, size, size)
   const data = imageData.data
-  
+
   let brightness = 0
   let shrimpLikePixels = 0
-  
+  let nonWhitePixels = 0
+
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i]
     const g = data[i + 1]
     const b = data[i + 2]
-    
+
     brightness += (r + g + b) / 3
-    
-    const isShrimpLike = r > 100 && g > 80 && b < r && b < g * 1.5
-    if (isShrimpLike) shrimpLikePixels++
+
+    // Check if not pure white/neutral background
+    if (!(r > 240 && g > 240 && b > 240)) {
+      nonWhitePixels++
+    }
+
+    // Expanded range for shrimp (handles pink, gray, translucent, white shrimp, and piles)
+    const isShrimpLike = (r > 60 && g > 50 && b > 40 && r >= b * 0.9) || (r > 150 && g > 130 && b > 110)
+    if (isShrimpLike) {
+      shrimpLikePixels++
+    }
   }
-  
+
   brightness = brightness / (data.length / 4) / 255
-  
-  if (brightness < 0.25 || brightness > 0.8) {
-    return { valid: false, message: 'Poor lighting. Please use natural light for better results.' }
+
+  if (brightness < 0.15 || brightness > 0.95) {
+    return { valid: false, message: 'Poor lighting. Please ensure good lighting for accurate screening.' }
   }
-  
-  const shrimpRatio = shrimpLikePixels / (data.length / 4)
-  if (shrimpRatio < 0.03) {
-    return { valid: false, message: 'No shrimp detected. Please center the shrimp in frame.' }
+
+  const nonWhiteRatio = nonWhitePixels / (data.length / 4)
+  if (nonWhiteRatio < 0.05) {
+    return { valid: false, message: 'Image appears to be blank or solid white background. Please upload a clear photo of shrimp.' }
   }
-  
+
   return { valid: true, message: '' }
 }
 
@@ -250,24 +259,38 @@ export function ShrimpHealthScreening() {
     }
   }, [previewUrl, stream])
 
+  useEffect(() => {
+    if (cameraActive && stream && videoRef.current) {
+      const video = videoRef.current
+      video.srcObject = stream
+      video.onloadedmetadata = () => {
+        video.play().catch(console.error)
+      }
+    }
+  }, [cameraActive, stream])
+
   async function startCamera() {
     try {
       setError('')
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      })
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-        await videoRef.current.play()
+      let mediaStream: MediaStream
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        })
+      } catch {
+        // Fallback to any available video camera
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true
+        })
       }
       setStream(mediaStream)
       setCameraActive(true)
     } catch (err) {
-      setError('Camera access denied or not available. Please use file upload instead.')
+      setError('Camera access denied or not available. Please allow camera permissions or use file upload.')
     }
   }
 

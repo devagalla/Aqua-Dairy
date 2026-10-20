@@ -32,7 +32,7 @@ export default function MarketPriceTicker() {
 
   useEffect(() => {
     const saved = localStorage.getItem('marketPrices')
-    const parsed = saved ? JSON.parse(saved) : []
+    const parsed: PriceData[] = saved ? JSON.parse(saved) : []
     setPrices(parsed)
 
     // Check for staleness
@@ -41,14 +41,75 @@ export default function MarketPriceTicker() {
       const daysDiff = (Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24)
       setIsStale(daysDiff > 3)
     }
-  }, [])
+
+    // Auto-fetch prices if region doesn't have prices or if stale
+    const regionPrices = parsed.filter(p => p.region === selectedRegion)
+    if (regionPrices.length === 0) {
+      fetchExternalPricesForRegion(selectedRegion, parsed)
+    }
+  }, [selectedRegion])
+
+  const fetchExternalPricesForRegion = async (region: string, currentPrices: PriceData[]) => {
+    setIsFetching(true)
+    setFetchError(null)
+
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const updatedList = [...currentPrices]
+
+      for (const countSize of COUNT_SIZES) {
+        const fetchResult = await priceRegistry.fetchPrices(region, countSize)
+        if (fetchResult.success && fetchResult.data && fetchResult.data.length > 0) {
+          const extPrice = fetchResult.data[0]
+
+          const existingIdx = updatedList.findIndex(
+            p => p.region === region && p.countSize === countSize
+          )
+
+          // Only overwrite if it doesn't exist or is not a manual entry
+          if (existingIdx === -1) {
+            updatedList.push({
+              id: `ext-${fetchResult.provider}-${region}-${countSize}-${today}`,
+              region,
+              countSize,
+              pricePerKg: extPrice.pricePerKg,
+              trend: 'stable',
+              date: extPrice.date,
+              note: `Auto-fetched from ${fetchResult.provider}`,
+              source: fetchResult.provider,
+              externalId: extPrice.metadata?.faoMarket as string || undefined,
+            })
+          } else if (updatedList[existingIdx].source !== 'manual') {
+            updatedList[existingIdx] = {
+              ...updatedList[existingIdx],
+              pricePerKg: extPrice.pricePerKg,
+              source: fetchResult.provider,
+              date: extPrice.date,
+            }
+          }
+        }
+      }
+
+      setPrices(updatedList)
+      localStorage.setItem('marketPrices', JSON.stringify(updatedList))
+      setLastFetchTime(new Date().toISOString())
+      setIsStale(false)
+    } catch (error) {
+      setFetchError(error instanceof Error ? error.message : 'Failed to fetch external prices')
+    } finally {
+      setIsFetching(false)
+    }
+  }
 
   const handlePriceUpdate = (countSize: CountSize, newPrice: number, trend: Trend, note?: string) => {
     const today = new Date().toISOString().split('T')[0]
     const existingIndex = prices.findIndex(p => p.countSize === countSize && p.region === selectedRegion)
     let updatedPrices: PriceData[]
 
-    if (existingIndex >= 0) {
+    if (newPrice === 0) {
+      // If cleared or zero, remove entry so farmer can re-fetch
+      updatedPrices = prices.filter(p => !(p.countSize === countSize && p.region === selectedRegion))
+    } else if (existingIndex >= 0) {
       // Update existing entry
       updatedPrices = prices.map((p, i) =>
         i === existingIndex ? { ...p, pricePerKg: newPrice, trend, date: today, note, source: 'manual' } : p
@@ -76,62 +137,7 @@ export default function MarketPriceTicker() {
   }
 
   const handleFetchExternalPrices = async () => {
-    setIsFetching(true)
-    setFetchError(null)
-
-    try {
-      // Try to fetch from all providers for the selected region
-      const results = await priceRegistry.fetchFromAll(selectedRegion, 50) // sample count size
-
-      // For each count size, try to get data
-      const newPrices: PriceData[] = []
-      const today = new Date().toISOString().split('T')[0]
-
-      for (const countSize of COUNT_SIZES) {
-        const fetchResult = await priceRegistry.fetchPrices(selectedRegion, countSize)
-        if (fetchResult.success && fetchResult.data && fetchResult.data.length > 0) {
-          // Use the first (highest priority) result
-          const extPrice = fetchResult.data[0]
-
-          // Check if we already have a manual entry for this
-          const existingIndex = prices.findIndex(
-            p => p.region === selectedRegion && p.countSize === countSize && p.source === 'manual'
-          )
-
-          if (existingIndex >= 0) {
-            // Keep manual entry, but we could show external as reference
-            continue
-          }
-
-          // Add external price entry
-          newPrices.push({
-            id: `ext-${fetchResult.provider}-${selectedRegion}-${countSize}-${today}`,
-            region: selectedRegion,
-            countSize,
-            pricePerKg: extPrice.pricePerKg,
-            trend: 'stable', // External data doesn't have trend
-            date: extPrice.date,
-            note: `Auto-fetched from ${fetchResult.provider}`,
-            source: fetchResult.provider,
-            externalId: extPrice.metadata?.faoMarket as string || undefined,
-          })
-        }
-      }
-
-      if (newPrices.length > 0) {
-        const updated = [...prices, ...newPrices]
-        setPrices(updated)
-        localStorage.setItem('marketPrices', JSON.stringify(updated))
-        setLastFetchTime(new Date().toISOString())
-        setIsStale(false)
-      } else {
-        setFetchError('No external price data available for this region. Try a different region or check back later.')
-      }
-    } catch (error) {
-      setFetchError(error instanceof Error ? error.message : 'Failed to fetch external prices')
-    } finally {
-      setIsFetching(false)
-    }
+    await fetchExternalPricesForRegion(selectedRegion, prices)
   }
 
   const getProjection = (region: string, countSize: CountSize) => {
