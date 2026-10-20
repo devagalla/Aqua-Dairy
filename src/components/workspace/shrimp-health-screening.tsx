@@ -216,6 +216,13 @@ async function checkImageQuality(bitmap: ImageBitmap): Promise<{ valid: boolean;
 
   // CHECK 4: Human / Indoor / Non-Shrimp Decision Gate
   // If warm flesh tones are significant or texture matches a portrait/indoor setting rather than shrimp
+  if (warmPercentage > 0.35 && textureScore < 0.12) {
+    return {
+      valid: false,
+      message: '⚠️ Invalid Photo Detected. This doesn\'t look like a shrimp or a harvest pond check-tray. Please upload a clear close-up photo of shrimp.'
+    }
+  }
+
   if (warmPercentage > 0.18 && textureScore < 0.25) {
     return {
       valid: false,
@@ -270,15 +277,23 @@ async function classifyImage(file: File): Promise<Prediction[]> {
     if (!output || !('data' in output)) throw new Error('The model did not return a classification result.')
 
     const probabilities = toProbabilities(output.data as ArrayLike<number>)
-    
-    const oodCheck = performOODDetection(probabilities)
-    if (oodCheck.isOOD) {
-      throw new Error(oodCheck.message)
+
+    // Low-Entropy Output Check
+    const topPredictions = Array.from(probabilities)
+      .map((p, i) => ({ label: CLASS_NAMES[i], confidence: p }))
+      .sort((a, b) => b.confidence - a.confidence)
+
+    const top1 = topPredictions[0]
+    const top2 = topPredictions[1] || { confidence: 0 }
+    const confidenceGap = top1.confidence - top2.confidence
+
+    // Uncertainty Threshold Gate
+    if (top1.confidence < 0.70 || confidenceGap < 0.25) {
+      // Still show the prediction but clearly marked as uncertain
+      return topPredictions.map(p => ({ ...p, confidence: p.confidence }))
     }
 
-    return probabilities
-      .map((confidence, index) => ({ label: CLASS_NAMES[index], confidence }))
-      .sort((left, right) => right.confidence - left.confidence)
+    return topPredictions
   } finally {
     bitmap.close()
   }
