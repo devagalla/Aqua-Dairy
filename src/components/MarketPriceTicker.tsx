@@ -45,11 +45,31 @@ export default function MarketPriceTicker() {
 
   const handlePriceUpdate = (countSize: CountSize, newPrice: number, trend: Trend, note?: string) => {
     const today = new Date().toISOString().split('T')[0]
-    const updatedPrices = prices.map(p =>
-      (p.countSize === countSize && p.region === selectedRegion)
-        ? { ...p, pricePerKg: newPrice, trend, date: today, note, source: 'manual' }
-        : p
-    )
+    const existingIndex = prices.findIndex(p => p.countSize === countSize && p.region === selectedRegion)
+    let updatedPrices: PriceData[]
+
+    if (existingIndex >= 0) {
+      // Update existing entry
+      updatedPrices = prices.map((p, i) =>
+        i === existingIndex ? { ...p, pricePerKg: newPrice, trend, date: today, note, source: 'manual' } : p
+      )
+    } else {
+      // Create new entry
+      updatedPrices = [
+        ...prices,
+        {
+          id: `manual-${selectedRegion}-${countSize}-${today}`,
+          region: selectedRegion,
+          countSize,
+          pricePerKg: newPrice,
+          trend,
+          date: today,
+          note,
+          source: 'manual',
+        }
+      ]
+    }
+
     setPrices(updatedPrices)
     localStorage.setItem('marketPrices', JSON.stringify(updatedPrices))
     setIsStale(false)
@@ -202,8 +222,13 @@ export default function MarketPriceTicker() {
                       type="number"
                       value={priceData?.pricePerKg || ''}
                       onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0
                         if (priceData) {
-                          handlePriceUpdate(count, parseFloat(e.target.value) || 0, priceData.trend, priceData.note)
+                          // Update existing entry
+                          handlePriceUpdate(count, value, priceData.trend, priceData.note)
+                        } else if (value > 0) {
+                          // Create new entry with default trend
+                          handlePriceUpdate(count, value, 'stable')
                         }
                       }}
                       className="w-32 min-h-[56px] p-3 border border-gray-300 rounded text-lg"
