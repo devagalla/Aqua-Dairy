@@ -215,22 +215,22 @@ async function checkImageQuality(bitmap: ImageBitmap): Promise<{ valid: boolean;
   const textureScore = highContrastEdges / totalPixels
 
   // CHECK 4: Human / Indoor / Non-Shrimp Decision Gate
-  // If warm flesh tones are significant or texture matches a portrait/indoor setting rather than shrimp
-  if (warmPercentage > 0.35 && textureScore < 0.12) {
+  // If warm flesh tones dominate and texture is very low, likely a portrait
+  if (warmPercentage > 0.65 && textureScore < 0.12) {
     return {
       valid: false,
       message: '⚠️ Invalid Photo Detected. This doesn\'t look like a shrimp or a harvest pond check-tray. Please upload a clear close-up photo of shrimp.'
     }
   }
 
-  if (warmPercentage > 0.18 && textureScore < 0.25) {
+  if (warmPercentage > 0.55 && textureScore < 0.20) {
     return {
       valid: false,
       message: '⚠️ Non-shrimp subject detected. Please upload a close-up photo of actual shrimp on a check-tray or flat surface.'
     }
   }
 
-  if (warmPercentage > 0.35) {
+  if (warmPercentage > 0.75) {
     return {
       valid: false,
       message: '⚠️ Non-shrimp subject detected (skin/indoor tones). Please capture shrimp in pond water or check-tray.'
