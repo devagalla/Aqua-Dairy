@@ -1,9 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useGrossCropValue } from '@/hooks/useGrossCropValue'
+import { projectPrice, type Trend, type CountSize } from '@/utils/pricePrediction'
 
-type CountSize = 30 | 40 | 50 | 60 | 70 | 80 | 90 | 100
-type Trend = 'up' | 'stable' | 'down'
+type PriceHistoryEntry = { pricePerKg: number; date: string }
+type PriceHistory = Record<string, PriceHistoryEntry[]> // Key: region-countSize
+
+// ... inside component ...
+  const [prices, setPrices] = useState<PriceData[]>([])
+  const [priceHistory, setPriceHistory] = useState<PriceHistory>({})
 
 interface PriceData {
   id: string
@@ -22,45 +28,41 @@ export default function MarketPriceTicker() {
   const [prices, setPrices] = useState<PriceData[]>([])
   const [selectedRegion, setSelectedRegion] = useState<string>('Bhimavaram')
   const [isStale, setIsStale] = useState(false)
-  
+
   useEffect(() => {
     const saved = localStorage.getItem('marketPrices')
-    if (saved) {
-      setPrices(JSON.parse(saved))
-      // Check for staleness
-      const parsed = JSON.parse(saved)
+    const parsed = saved ? JSON.parse(saved) : []
+    setPrices(parsed)
+
+    // Check for staleness
+    if (parsed.length > 0) {
       const latestDate = new Date(Math.max(...parsed.map((p: PriceData) => new Date(p.date).getTime())))
       const daysDiff = (Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24)
       setIsStale(daysDiff > 3)
-    } else {
-      // Generate sample prices for all regions
-      const allSamplePrices: PriceData[] = []
-      REGIONS.forEach(region => {
-        COUNT_SIZES.forEach(count => {
-          allSamplePrices.push({
-            id: `${region}-${count}`,
-            region: region,
-            countSize: count,
-            pricePerKg: 350 + Math.random() * 100,
-            trend: ['up', 'stable', 'down'][Math.floor(Math.random() * 3)] as Trend,
-            date: new Date().toISOString().split('T')[0]
-          })
-        })
-      })
-      setPrices(allSamplePrices)
-      localStorage.setItem('marketPrices', JSON.stringify(allSamplePrices))
     }
   }, [])
-  
+
   const handlePriceUpdate = (countSize: CountSize, newPrice: number, trend: Trend, note?: string) => {
+    const today = new Date().toISOString().split('T')[0]
     const updatedPrices = prices.map(p =>
       (p.countSize === countSize && p.region === selectedRegion)
-        ? { ...p, pricePerKg: newPrice, trend, date: new Date().toISOString().split('T')[0], note }
+        ? { ...p, pricePerKg: newPrice, trend, date: today, note }
         : p
     )
     setPrices(updatedPrices)
     localStorage.setItem('marketPrices', JSON.stringify(updatedPrices))
     setIsStale(false)
+  }
+
+  const getProjection = (region: string, countSize: CountSize) => {
+    const history = prices
+      .filter(p => p.region === region && p.countSize === countSize)
+      .map(p => ({ pricePerKg: p.pricePerKg, date: p.date }))
+
+    const current = prices.find(p => p.region === region && p.countSize === countSize)
+    if (!current) return null
+
+    return projectPrice(current.pricePerKg, history, current.trend, 7)
   }
 
   const filteredPrices = prices.filter(p => p.region === selectedRegion)
@@ -100,12 +102,13 @@ export default function MarketPriceTicker() {
               <th className="text-left p-3 font-semibold">Count Size</th>
               <th className="text-left p-3 font-semibold">Price / kg (INR)</th>
               <th className="text-left p-3 font-semibold">Trend</th>
-              <th className="text-left p-3 font-semibold">Last Updated</th>
+              <th className="text-left p-3 font-semibold">Projection (7d)</th>
             </tr>
           </thead>
           <tbody>
             {COUNT_SIZES.map(count => {
               const priceData = filteredPrices.find(p => p.countSize === count)
+              const projection = priceData ? getProjection(selectedRegion, count) : null
               return (
                 <tr key={count} className="border-b border-gray-200">
                   <td className="p-3 font-medium">{count} count</td>
@@ -137,8 +140,19 @@ export default function MarketPriceTicker() {
                       <option value="down">🔴 Downward</option>
                     </select>
                   </td>
-                  <td className="p-3 text-sm text-gray-600">
-                    {priceData?.date || 'Not set'}
+                  <td className="p-3">
+                    {projection ? (
+                      <div className="text-sm">
+                        <p className={`font-semibold ${projection.delta > 0 ? 'text-green-600' : projection.delta < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                          ₹{projection.projectedPrice.toFixed(0)}
+                        </p>
+                        <p className="text-xs text-gray-500 italic truncate max-w-[120px]" title={projection.advice}>
+                          {projection.advice}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">Log 3+ days</span>
+                    )}
                   </td>
                 </tr>
               )
