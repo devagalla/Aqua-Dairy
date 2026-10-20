@@ -215,22 +215,28 @@ async function checkImageQuality(bitmap: ImageBitmap): Promise<{ valid: boolean;
   const textureScore = highContrastEdges / totalPixels
 
   // CHECK 4: Human / Indoor / Non-Shrimp Decision Gate
-  // If warm flesh tones dominate and texture is very low, likely a portrait
-  if (warmPercentage > 0.65 && textureScore < 0.12) {
+  // Only reject when warm skin tones dominate *and* texture is low (portrait/indoor).
+  // Hand-held shrimp still has high edge texture from shrimp/carapace, so it passes.
+  if (textureScore > 0.22) {
+    // High texture strongly suggests shrimp/tray detail; skip warm gate
+    return { valid: true, message: '' }
+  }
+
+  if (warmPercentage > 0.70 && textureScore < 0.10) {
     return {
       valid: false,
       message: '⚠️ Invalid Photo Detected. This doesn\'t look like a shrimp or a harvest pond check-tray. Please upload a clear close-up photo of shrimp.'
     }
   }
 
-  if (warmPercentage > 0.55 && textureScore < 0.20) {
+  if (warmPercentage > 0.60 && textureScore < 0.18) {
     return {
       valid: false,
       message: '⚠️ Non-shrimp subject detected. Please upload a close-up photo of actual shrimp on a check-tray or flat surface.'
     }
   }
 
-  if (warmPercentage > 0.75) {
+  if (warmPercentage > 0.80 && textureScore < 0.25) {
     return {
       valid: false,
       message: '⚠️ Non-shrimp subject detected (skin/indoor tones). Please capture shrimp in pond water or check-tray.'
