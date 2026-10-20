@@ -270,7 +270,46 @@ textarea:focus-visible {
 .page-heading h1 { margin: 7px 0 8px; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(32px, 4vw, 43px); font-weight: 500; letter-spacing: -.05em; }
 .page-heading p { max-width: 590px; margin: 0; color: #7a8e83; font-size: 12px; line-height: 1.8; }
 .heading-orbit { display: grid; width: 58px; height: 58px; flex: 0 0 auto; place-items: center; border: 1px solid #d8e7d8; border-radius: 50%; background: #edf4e8; color: #7caa81; font-size: 24px; animation: float-soft 5s ease-in-out infinite; }
-.card-surface { border: 1px solid #e4eadd; border-radius: 8px; background: var(--paper); box-shadow: 0 7px 22px rgba(35, 76, 53, .035); }
+.card-surface {
+  border: 1px solid #e4eadd;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 4px 6px -1px rgba(35, 76, 53, 0.05), 0 2px 4px -1px rgba(35, 76, 53, 0.03);
+  padding: 24px;
+}
+.card-surface:hover {
+  box-shadow: 0 10px 15px -3px rgba(35, 76, 53, 0.1), 0 4px 6px -2px rgba(35, 76, 53, 0.05);
+}
+.workspace-content {
+  width: min(1200px, 100%);
+  margin: auto;
+  padding: 48px clamp(22px, 5vw, 66px) 70px;
+}
+h1, h2, h3 {
+  font-family: 'Georgia', serif;
+  color: var(--ink);
+}
+.button-primary {
+  background: var(--sea);
+  color: white;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.button-primary:hover {
+  background: var(--sea-dark);
+  transform: translateY(-1px);
+}
+input, select {
+  border-radius: 8px !important;
+  border: 1px solid #d1d9cc !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+input:focus, select:focus {
+  border-color: var(--sea) !important;
+  box-shadow: 0 0 0 3px rgba(20, 123, 114, 0.1) !important;
+}
 .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .card-heading h2 { margin: 6px 0 0; color: #284d43; font-family: Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 500; letter-spacing: -.025em; }
 .quiet-state { color: #829289; font-size: 12px; line-height: 1.75; }

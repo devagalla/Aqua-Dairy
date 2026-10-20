@@ -131,57 +131,103 @@ function performOODDetection(probabilities: number[]) {
 }
 
 /**
- * Image quality checks before model inference
+ * Client-side visual heuristic checks before model inference
+ * Rejects humans, faces, indoor objects, walls, laptops, and plain backgrounds
  */
 async function checkImageQuality(bitmap: ImageBitmap): Promise<{ valid: boolean; message: string }> {
   const canvas = document.createElement('canvas')
-  const size = Math.min(bitmap.width, bitmap.height, 640)
-  canvas.width = size
-  canvas.height = size
+  const width = 160
+  const height = 160
+  canvas.width = width
+  canvas.height = height
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return { valid: false, message: 'Could not analyze image quality' }
+  if (!ctx) return { valid: false, message: 'Could not analyze image.' }
 
-  const cropSize = Math.min(bitmap.width, bitmap.height)
-  const cropX = (bitmap.width - cropSize) / 2
-  const cropY = (bitmap.height - cropSize) / 2
-  ctx.drawImage(bitmap, cropX, cropY, cropSize, cropSize, 0, 0, size, size)
+  ctx.drawImage(bitmap, 0, 0, width, height)
+  const imgData = ctx.getImageData(0, 0, width, height).data
+  const totalPixels = width * height
 
-  const imageData = ctx.getImageData(0, 0, size, size)
-  const data = imageData.data
+  let redWarmPixels = 0
+  let whiteBlankPixels = 0
+  let totalBrightness = 0
 
-  let brightness = 0
-  let shrimpLikePixels = 0
-  let nonWhitePixels = 0
+  for (let i = 0; i < imgData.length; i += 4) {
+    const r = imgData[i]
+    const g = imgData[i + 1]
+    const b = imgData[i + 2]
 
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i]
-    const g = data[i + 1]
-    const b = data[i + 2]
+    const brightness = (r + g + b) / 3
+    totalBrightness += brightness
 
-    brightness += (r + g + b) / 3
-
-    // Check if not pure white/neutral background
-    if (!(r > 240 && g > 240 && b > 240)) {
-      nonWhitePixels++
+    // Detect pure white/blank background
+    if (r > 240 && g > 240 && b > 240) {
+      whiteBlankPixels++
     }
 
-    // Expanded range for shrimp (handles pink, gray, translucent, white shrimp, and piles)
-    const isShrimpLike = (r > 60 && g > 50 && b > 40 && r >= b * 0.9) || (r > 150 && g > 130 && b > 110)
-    if (isShrimpLike) {
-      shrimpLikePixels++
+    // Detect human skin tones and warm indoor room lighting (high red relative to green/blue)
+    // Common human skin spectrum: R > G > B with warm chroma
+    if (r > 95 && g > 60 && b > 40 && r > g * 1.08 && g > b * 1.05 && (r - b) > 25) {
+      redWarmPixels++
     }
   }
 
-  brightness = brightness / (data.length / 4) / 255
+  const avgBrightness = totalBrightness / totalPixels / 255
+  const warmPercentage = redWarmPixels / totalPixels
+  const blankPercentage = whiteBlankPixels / totalPixels
 
-  if (brightness < 0.15 || brightness > 0.95) {
-    return { valid: false, message: 'Poor lighting. Please ensure good lighting for accurate screening.' }
+  // CHECK 1: Blank / Solid White Background
+  if (blankPercentage > 0.85) {
+    return {
+      valid: false,
+      message: 'Image appears to be a blank or white background. Please upload a clear photo of shrimp in a tray or pond sample.'
+    }
   }
 
-  const nonWhiteRatio = nonWhitePixels / (data.length / 4)
-  if (nonWhiteRatio < 0.05) {
-    return { valid: false, message: 'Image appears to be blank or solid white background. Please upload a clear photo of shrimp.' }
+  // CHECK 2: Extreme lighting
+  if (avgBrightness < 0.12 || avgBrightness > 0.94) {
+    return {
+      valid: false,
+      message: 'Poor lighting. Please ensure the shrimp is visible under natural or diffused light.'
+    }
+  }
+
+  // CHECK 3: Texture / Edge Density Check
+  // Natural shrimp and check-trays have high edge frequency (antennae, legs, shell rings, tray mesh).
+  // Human portraits, walls, pillows, clothing, and screens have large smooth low-frequency blocks.
+  let highContrastEdges = 0
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const idx = (y * width + x) * 4
+      const rightIdx = (y * width + (x + 1)) * 4
+      const bottomIdx = ((y + 1) * width + x) * 4
+
+      const lum = (imgData[idx] * 0.299 + imgData[idx + 1] * 0.587 + imgData[idx + 2] * 0.114)
+      const lumRight = (imgData[rightIdx] * 0.299 + imgData[rightIdx + 1] * 0.587 + imgData[rightIdx + 2] * 0.114)
+      const lumBottom = (imgData[bottomIdx] * 0.299 + imgData[bottomIdx + 1] * 0.587 + imgData[bottomIdx + 2] * 0.114)
+
+      if (Math.abs(lum - lumRight) > 22 || Math.abs(lum - lumBottom) > 22) {
+        highContrastEdges++
+      }
+    }
+  }
+
+  const textureScore = highContrastEdges / totalPixels
+
+  // CHECK 4: Human / Indoor / Non-Shrimp Decision Gate
+  // If warm flesh tones are significant or texture matches a portrait/indoor setting rather than shrimp
+  if (warmPercentage > 0.18 && textureScore < 0.25) {
+    return {
+      valid: false,
+      message: '⚠️ Non-shrimp subject detected. Please upload a close-up photo of actual shrimp on a check-tray or flat surface.'
+    }
+  }
+
+  if (warmPercentage > 0.35) {
+    return {
+      valid: false,
+      message: '⚠️ Non-shrimp subject detected (skin/indoor tones). Please capture shrimp in pond water or check-tray.'
+    }
   }
 
   return { valid: true, message: '' }
