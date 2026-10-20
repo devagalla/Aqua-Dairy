@@ -4,6 +4,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+    "target": "ES2017",
     "lib": [
       "dom",
       "dom.iterable",
@@ -20,6 +21,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
+    "downlevelIteration": true,
     "plugins": [
       {
         "name": "next"

@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 import { calculateADG, detectStuntedGrowth, calculateBiomassKg } from '@/utils/growthMath'
+import { estimateHarvestCount, nearestCountTier, projectPrice, type PriceProjection } from '@/utils/pricePrediction'
+import { fetchMarketPrice, priceRegistry } from '@/lib/price-providers'
 import * as benchmarksData from '@/data/shrimpGrowthBenchmarks.json'
 
 interface Benchmark {
@@ -395,6 +397,224 @@ function SamplingForm({
   )
 }
 
+// Harvest Optimizer - calculates optimal harvest date based on growth + price projections
+function HarvestOptimizer({
+  pondConfig,
+  latestRecord,
+  adg,
+  biomass,
+  region = 'Bhimavaram'
+}: {
+  pondConfig: PondConfig | null
+  latestRecord: SamplingRecord | null
+  adg: number | null
+  biomass: number
+  region?: string
+}) {
+  if (!pondConfig || !latestRecord || adg === null || adg <= 0) {
+    return (
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <h4 className="font-semibold mb-2 text-gray-600">🎯 Harvest Optimizer</h4>
+        <p className="text-sm text-gray-500">Add sampling records with ADG to see optimal harvest recommendations.</p>
+      </div>
+    )
+  }
+
+  const [harvestProjection, setHarvestProjection] = useState<{
+    optimalDay: number
+    optimalCountSize: number
+    projectedPrice: number
+    projectedRevenue: number
+    daysToHarvest: number
+    harvestDate: string
+    priceProjection: PriceProjection | null
+    loading: boolean
+    error: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    const calculateOptimalHarvest = async () => {
+      setHarvestProjection({
+        optimalDay: 0,
+        optimalCountSize: 0,
+        projectedPrice: 0,
+        projectedRevenue: 0,
+        daysToHarvest: 0,
+        harvestDate: '',
+        priceProjection: null,
+        loading: true,
+        error: null
+      })
+
+      try {
+        const currentDoc = latestRecord.doc
+        const currentMbw = latestRecord.mbwGrams
+
+        // Look ahead 30-60 days in 7-day increments
+        const scenarios = []
+        for (let daysAhead = 7; daysAhead <= 60; daysAhead += 7) {
+          const harvestDoc = currentDoc + daysAhead
+          const estimatedCount = estimateHarvestCount(currentMbw, adg, daysAhead)
+
+          if (!estimatedCount) continue
+
+          const countTier = nearestCountTier(estimatedCount)
+
+          // Get price projection for this count tier
+          const prices = await fetchMarketPrice(region, countTier)
+          let priceProjection: PriceProjection | null = null
+          let projectedPrice = 350 // fallback
+
+          if (prices.length > 0) {
+            // Use latest price as current
+            const latestPrice = prices[0].pricePerKg
+            const history = prices.map(p => ({ pricePerKg: p.pricePerKg, date: p.date }))
+            priceProjection = projectPrice(latestPrice, history, 'stable', daysAhead)
+            projectedPrice = priceProjection.projectedPrice || latestPrice
+          }
+
+          // Estimate survival at harvest (gradual decline)
+          const survivalAtHarvest = Math.max(
+            latestRecord.survivalPercent * Math.pow(0.995, daysAhead),
+            40
+          )
+
+          const harvestBiomass = calculateBiomassKg(
+            pondConfig.seedCount,
+            survivalAtHarvest,
+            currentMbw + (adg * daysAhead)
+          )
+
+          const projectedRevenue = harvestBiomass * projectedPrice
+
+          scenarios.push({
+            daysAhead,
+            harvestDoc,
+            countTier,
+            projectedPrice,
+            harvestBiomass,
+            projectedRevenue,
+            priceProjection,
+            harvestDate: new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          })
+        }
+
+        // Find optimal (max revenue)
+        const optimal = scenarios.reduce((best, curr) =>
+          curr.projectedRevenue > best.projectedRevenue ? curr : best
+        , scenarios[0])
+
+        setHarvestProjection({
+          optimalDay: optimal.harvestDoc,
+          optimalCountSize: optimal.countTier,
+          projectedPrice: optimal.projectedPrice,
+          projectedRevenue: optimal.projectedRevenue,
+          daysToHarvest: optimal.daysAhead,
+          harvestDate: optimal.harvestDate,
+          priceProjection: optimal.priceProjection,
+          loading: false,
+          error: null
+        })
+      } catch (error) {
+        setHarvestProjection({
+          optimalDay: 0,
+          optimalCountSize: 0,
+          projectedPrice: 0,
+          projectedRevenue: 0,
+          daysToHarvest: 0,
+          harvestDate: '',
+          priceProjection: null,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to calculate'
+        })
+      }
+    }
+
+    calculateOptimalHarvest()
+  }, [pondConfig, latestRecord, adg, region])
+
+  if (!harvestProjection) return null
+
+  if (harvestProjection.loading) {
+    return (
+      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <h4 className="font-semibold mb-2">🎯 Harvest Optimizer</h4>
+        <p className="text-sm text-blue-700">Analyzing growth trajectory & market prices...</p>
+      </div>
+    )
+  }
+
+  if (harvestProjection.error) {
+    return (
+      <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+        <h4 className="font-semibold mb-2 text-red-800">🎯 Harvest Optimizer</h4>
+        <p className="text-sm text-red-700">Error: {harvestProjection.error}</p>
+      </div>
+    )
+  }
+
+  const hp = harvestProjection
+  const currentDoc = latestRecord.doc
+  const daysToTargetCount = hp.optimalDay - currentDoc
+
+  return (
+    <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+      <h4 className="font-semibold mb-3 text-green-800 flex items-center gap-2">
+        🎯 Optimal Harvest Recommendation
+      </h4>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="bg-white p-3 rounded border">
+          <p className="text-xs text-gray-500">Target Harvest Date</p>
+          <p className="text-lg font-bold text-green-700">{new Date(hp.harvestDate).toLocaleDateString('en-IN')}</p>
+        </div>
+        <div className="bg-white p-3 rounded border">
+          <p className="text-xs text-gray-500">Days from Now</p>
+          <p className="text-lg font-bold text-green-700">{hp.daysToHarvest} days</p>
+        </div>
+        <div className="bg-white p-3 rounded border">
+          <p className="text-xs text-gray-500">Target DOC</p>
+          <p className="text-lg font-bold text-green-700">{hp.optimalDay}</p>
+        </div>
+        <div className="bg-white p-3 rounded border">
+          <p className="text-xs text-gray-500">Projected Count Size</p>
+          <p className="text-lg font-bold text-green-700">{hp.optimalCountSize} count</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="bg-white p-3 rounded border">
+          <p className="text-xs text-gray-500">Projected Price/kg</p>
+          <p className="text-lg font-bold text-amber-700">₹{hp.projectedPrice.toFixed(0)}</p>
+        </div>
+        <div className="bg-white p-3 rounded border">
+          <p className="text-xs text-gray-500">Projected Revenue</p>
+          <p className="text-xl font-bold text-amber-700">₹{hp.projectedRevenue.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {hp.priceProjection && hp.priceProjection.delta !== null && (
+        <div className="bg-white p-3 rounded border border-green-200">
+          <p className="text-xs text-gray-500 mb-1">Price Trend Forecast</p>
+          <p className={`text-sm font-medium ${hp.priceProjection.delta > 0 ? 'text-green-600' : hp.priceProjection.delta < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+            {hp.priceProjection.advice}
+          </p>
+          <p className="text-xs text-gray-500">
+            Confidence: {hp.priceProjection.confidence} • {hp.priceProjection.deltaPercent?.toFixed(1)}% change projected
+          </p>
+        </div>
+      )}
+
+      <div className="mt-3 p-3 bg-green-100 rounded border border-green-300">
+        <p className="text-sm text-green-800">
+          <strong>Recommendation:</strong> Harvest around <strong>DOC {hp.optimalDay}</strong> ({hp.daysToHarvest} days from now)
+          when shrimp reach ~{hp.optimalCountSize} count/kg for maximum revenue of ~₹{hp.projectedRevenue.toLocaleString()}.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // Metrics Dashboard
 function MetricsDashboard({
   pondConfig,
@@ -458,8 +678,16 @@ function MetricsDashboard({
       <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
         <h4 className="font-semibold mb-2">Gross Crop Value</h4>
         <p className="text-2xl font-bold text-amber-800">₹{gcvm.toFixed(0)}</p>
-        <p className="text-sm text-gray-600">Estimated value at harvest</p>
+        <p className="text-sm text-gray-600">Estimated value at harvest (at ₹350/kg)</p>
       </div>
+
+      <HarvestOptimizer
+        pondConfig={pondConfig}
+        latestRecord={latestRecord}
+        adg={adg}
+        biomass={biomass}
+        region="Bhimavaram"
+      />
     </div>
   )
 }
