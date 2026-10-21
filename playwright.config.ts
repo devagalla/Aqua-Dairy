@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
+import dotenv from 'dotenv'
+import path from 'path'
+
+// Load environment variables from .env.local
+dotenv.config({ path: path.resolve(__dirname, '.env.local') })
 
 // Set test mode env var for the dev server
 process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST = 'true'
