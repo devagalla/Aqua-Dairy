@@ -321,6 +321,21 @@ export default function PondsPage() {
                           : null}
                         onSelect={(location) => savePondLocation(pond.id, location)}
                       />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="ml-2"
+                        onClick={async () => {
+                          if (window.confirm('Delete this pond and all its history?')) {
+                            setSaving(true);
+                            await supabase.from('ponds').delete().eq('id', pond.id);
+                            await load();
+                            setSaving(false);
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
                     </div>
                   </article>
                 })}

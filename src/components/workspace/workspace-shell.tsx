@@ -232,9 +232,7 @@ function WorkspaceShellInner({
                     <strong>{p.name}</strong>
                     {p.activeCycle ? (
                       <span className="pill-doc">DOC {p.activeCycle.doc}</span>
-                    ) : (
-                      <span className="pill-doc">No cycle</span>
-                    )}
+                    ) : null}
                   </button>
                 )
               })}
