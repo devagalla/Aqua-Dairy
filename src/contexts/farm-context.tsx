@@ -95,6 +95,11 @@ export function FarmProvider({
       setLocation(derivedLocation)
 
       const profileData = profileRes.data as { full_name?: string; farmer_name?: string } | null
+
+      // Farmer Name logic:
+      // 1. Profile farmer_name
+      // 2. Profile full_name
+      // 3. User email prefix
       const derivedFarmerName =
         profileData?.farmer_name ||
         profileData?.full_name ||
@@ -112,7 +117,7 @@ export function FarmProvider({
         let activeCycleInfo: PondSummary['activeCycle']
         if (cycle) {
           const stockingMs = Date.parse(`${cycle.stocking_date}T00:00:00Z`)
-          const doc = Math.max(1, Math.floor((Date.now() - stockingMs) / 86_400_000) + 1)
+          const doc = Math.max(0, Math.floor((Date.now() - stockingMs) / 86_400_000))
           activeCycleInfo = {
             id: cycle.id,
             stockingDate: cycle.stocking_date,

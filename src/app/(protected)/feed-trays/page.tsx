@@ -44,6 +44,7 @@ export default function FeedTraysPage() {
           <span className="eyebrow">FEED &amp; CHECK TRAYS</span>
           <h1>Daily feeding &amp; tray checks</h1>
           <p>Record feed and check tray observations. Intelligent feed adjustments are calculated in real time.</p>
+          <span className="telugu-subtitle" lang="te">మేత మరియు ట్రే పరిశీలనలను ఇక్కడ నమోదు చేయండి. సరైన మేత సర్దుబాట్లు ఇక్కడ లెక్కించబడతాయి.</span>
         </div>
         <span className="heading-orbit" aria-hidden="true">◈</span>
       </div>
