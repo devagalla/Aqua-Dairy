@@ -18,7 +18,7 @@ interface PondConfig {
   stockingDate: string
   seedCount: number
   pondAreaAcres: number
-  targetHarvestCount?: number
+  targetHarvestCount?: number | null
 }
 
 interface SamplingRecord {
@@ -28,9 +28,25 @@ interface SamplingRecord {
   survivalPercent: number
 }
 
+import { useFarm } from '@/contexts/farm-context'
+
 export default function GrowthTracker() {
-  const [pondConfig, setPondConfig] = useState<PondConfig | null>(null)
+  const { activePond, ponds } = useFarm()
+  const [localPondConfig, setLocalPondConfig] = useState<PondConfig | null>(null)
   const [samplingRecords, setSamplingRecords] = useState<SamplingRecord[]>([])
+
+  const pondConfig = useMemo(() => {
+    if (activePond) {
+      return {
+        pondName: activePond.name,
+        stockingDate: activePond.activeCycle?.stockingDate || new Date().toISOString().split('T')[0],
+        seedCount: activePond.activeCycle?.seedStocked || 0,
+        pondAreaAcres: activePond.areaAcres || 0,
+        targetHarvestCount: activePond.activeCycle?.targetDays
+      }
+    }
+    return localPondConfig
+  }, [activePond, localPondConfig])
 
   // Calculate metrics with memoization
   const latestRecord = useMemo(() =>
@@ -58,7 +74,7 @@ export default function GrowthTracker() {
   )
 
   const handlePondConfigChange = (config: PondConfig) => {
-    setPondConfig(config)
+    setLocalPondConfig(config)
     setSamplingRecords([])
   }
 
@@ -73,13 +89,19 @@ export default function GrowthTracker() {
           <div>
             <span className="eyebrow">GROWTH TRACKER</span>
             <h1>Pond Cycle Setup</h1>
-            <p>Configure your pond details to begin tracking growth and biomass.</p>
+            <p>Select a pond from the switcher or configure pond details manually.</p>
           </div>
           <span className="heading-orbit" aria-hidden="true">📈</span>
         </div>
 
+        {ponds.length > 0 && (
+          <div className="card-surface">
+            <p className="quiet-state">Please select an active pond from the switcher above to sync its data here.</p>
+          </div>
+        )}
+
         <div className="card-surface">
-          <h3>Pond Configuration</h3>
+          <h3>Manual Configuration</h3>
           <PondConfigForm onChange={handlePondConfigChange} />
         </div>
       </div>
