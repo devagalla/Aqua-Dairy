@@ -115,6 +115,7 @@ export default function GrowthTracker() {
           <span className="eyebrow">GROWTH TRACKER</span>
           <h1>{pondConfig.pondName} - Growth Analytics</h1>
           <p>Tracking DOC {samplingRecords.length > 0 ? samplingRecords[samplingRecords.length - 1].doc : 0} • {pondConfig.seedCount.toLocaleString()} seeds</p>
+          <p className="telugu-subtitle" lang="te">ప్రస్తుతం ఉన్న రోజులు: {samplingRecords.length > 0 ? samplingRecords[samplingRecords.length - 1].doc : 0} • {pondConfig.seedCount.toLocaleString()} రొయ్య పిల్లలు</p>
         </div>
         <span className="heading-orbit" aria-hidden="true">📈</span>
       </div>

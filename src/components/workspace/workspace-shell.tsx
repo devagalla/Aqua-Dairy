@@ -192,9 +192,11 @@ function WorkspaceShellInner({
           <div>
             <span className="topbar-eyebrow">
               {farmerName ? `Good to see you, ${farmerName}` : 'YOUR FARM, IN FOCUS'}
+              <span className="telugu-subtitle ml-2" lang="te">{farmerName ? `${farmerName} గారు, స్వాగతం` : ''}</span>
             </span>
             <span className="topbar-date">
               📍 {farmName || 'Coastal Aqua Farm'} {location ? `• ${location}` : ''}
+              <Link href="/ponds" className="ml-2 underline text-xs">Change</Link>
             </span>
             <span className={`offline-sync-status${!isOnline ? ' is-offline' : failedCount ? ' has-failures' : ''}`} role="status" aria-live="polite">
               {!isOnline
