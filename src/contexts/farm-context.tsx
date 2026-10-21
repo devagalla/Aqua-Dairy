@@ -99,11 +99,10 @@ export function FarmProvider({
       // Farmer Name logic:
       // 1. Profile farmer_name
       // 2. Profile full_name
-      // 3. User email prefix
+      // 3. User email prefix - ONLY if no profile name exists
       const derivedFarmerName =
         profileData?.farmer_name ||
         profileData?.full_name ||
-        userEmail.split('@')[0] ||
         'Farmer'
       setFarmerName(derivedFarmerName)
 

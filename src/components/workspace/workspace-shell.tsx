@@ -179,7 +179,7 @@ function WorkspaceShellInner({
           >
             <span className="profile-avatar">{email.charAt(0).toUpperCase() || 'F'}</span>
             <span className="profile-copy">
-              <strong>{email.split('@')[0] || 'Farm account'}</strong>
+              <strong>{farmerName || email.split('@')[0] || 'Farm account'}</strong>
               <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
             </span>
             <span className="profile-exit" aria-hidden="true">↗</span>
