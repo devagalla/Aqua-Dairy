@@ -1,9 +1,29 @@
 import { defineConfig, devices } from '@playwright/test'
-import dotenv from 'dotenv'
+import fs from 'fs'
 import path from 'path'
 
-// Load environment variables from .env.local
-dotenv.config({ path: path.resolve(__dirname, '.env.local') })
+// Load environment variables from .env.local manually using built-in fs
+try {
+  const envPath = path.resolve(__dirname, '.env.local')
+  if (fs.existsSync(envPath)) {
+    const envFile = fs.readFileSync(envPath, 'utf8')
+    envFile.split('\n').forEach(line => {
+      const match = line.match(/^([^=:#]+)=(.+)$/)
+      if (match) {
+        const key = match[1].trim()
+        let value = match[2].trim()
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1)
+        }
+        if (!process.env[key]) {
+          process.env[key] = value
+        }
+      }
+    })
+  }
+} catch (e) {
+  console.warn('Could not load .env.local for Playwright:', e)
+}
 
 // Set test mode env var for the dev server
 process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST = 'true'
