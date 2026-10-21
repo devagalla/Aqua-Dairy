@@ -236,6 +236,53 @@ export default function PondsPage() {
                 <Button type="submit" className="button-primary submit-button" disabled={saving}>Save farm <span aria-hidden="true">→</span></Button>
               </form>
             )}
+            
+            {farms.length > 0 && (
+              <div className="farm-list" style={{ marginTop: '20px' }}>
+                <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Existing farms</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {farms.map((farm) => (
+                    <div key={farm.id} style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      padding: '8px 12px',
+                      border: '1px solid #e1e8dc',
+                      borderRadius: '8px',
+                      backgroundColor: '#f7f8f0'
+                    }}>
+                      <span style={{ fontWeight: '500' }}>{farm.name}</span>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete farm "${farm.name}"? This will also delete all ponds and records under it.`)) {
+                              supabase.from('farms').delete().eq('id', farm.id)
+                                .then(() => {
+                                  load()
+                                  setSuccess('Farm deleted successfully')
+                                  setTimeout(() => setSuccess(''), 3000)
+                                })
+                            }
+                          }}
+                          style={{ 
+                            padding: '4px 12px', 
+                            backgroundColor: '#ed8d6e', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
           <div className="farm-manage-grid">
             <section className="card-surface record-form-card animate-in animate-delay">

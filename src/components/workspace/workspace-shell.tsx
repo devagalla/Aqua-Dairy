@@ -231,7 +231,9 @@ function WorkspaceShellInner({
                     <span className="pill-dot" aria-hidden="true" />
                     <strong>{p.name}</strong>
                     {p.activeCycle ? (
-                      <span className="pill-doc">DOC {p.activeCycle.doc}</span>
+                      <span className="pill-doc">
+                        {p.activeCycle.doc === 0 ? "New" : `DOC ${p.activeCycle.doc}`}
+                      </span>
                     ) : null}
                   </button>
                 )
