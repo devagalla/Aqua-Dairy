@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { OFFLINE_QUEUE_EVENT, readQueuedRecords, syncQueuedRecords } from '@/lib/offline/queue'
+import { FarmProvider, useFarm } from '@/contexts/farm-context'
 
 const links = [
   { href: '/pond-log', label: 'Pond Log', glyph: '◉' },
@@ -24,8 +25,27 @@ export function WorkspaceShell({
   email: string
   userId: string
 }) {
+  return (
+    <FarmProvider userId={userId} userEmail={email}>
+      <WorkspaceShellInner email={email} userId={userId}>
+        {children}
+      </WorkspaceShellInner>
+    </FarmProvider>
+  )
+}
+
+function WorkspaceShellInner({
+  children,
+  email,
+  userId,
+}: {
+  children: ReactNode
+  email: string
+  userId: string
+}) {
   const pathname = usePathname()
   const router = useRouter()
+  const { farmerName, farmName, location, ponds, activePondId, setActivePondId } = useFarm()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
   const [isOnline, setIsOnline] = useState(true)
@@ -170,13 +190,11 @@ export function WorkspaceShell({
       <div className="workspace-main">
         <header className="workspace-topbar">
           <div>
-            <span className="topbar-eyebrow">YOUR FARM, IN FOCUS</span>
+            <span className="topbar-eyebrow">
+              {farmerName ? `Good to see you, ${farmerName}` : 'YOUR FARM, IN FOCUS'}
+            </span>
             <span className="topbar-date">
-              {new Intl.DateTimeFormat('en', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              }).format(new Date())}
+              📍 {farmName || 'Coastal Aqua Farm'} {location ? `• ${location}` : ''}
             </span>
             <span className={`offline-sync-status${!isOnline ? ' is-offline' : failedCount ? ' has-failures' : ''}`} role="status" aria-live="polite">
               {!isOnline
@@ -194,6 +212,34 @@ export function WorkspaceShell({
             <span aria-hidden="true">＋</span> Ponds &amp; cycles
           </Link>
         </header>
+
+        {ponds.length > 0 && (
+          <div className="global-pond-switcher" role="region" aria-label="Global Pond Switcher">
+            <span className="switcher-label">Active Pond:</span>
+            <div className="switcher-pills">
+              {ponds.map((p) => {
+                const isActive = p.id === activePondId
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setActivePondId(p.id)}
+                    className={`switcher-pill${isActive ? ' active' : ''}`}
+                  >
+                    <span className="pill-dot" aria-hidden="true" />
+                    <strong>{p.name}</strong>
+                    {p.activeCycle ? (
+                      <span className="pill-doc">DOC {p.activeCycle.doc}</span>
+                    ) : (
+                      <span className="pill-doc">No cycle</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <main className="workspace-content">{children}</main>
         {(offlineError || offlineStorageError || serviceWorkerError) && (
           <p className="offline-sync-error" role="alert">
