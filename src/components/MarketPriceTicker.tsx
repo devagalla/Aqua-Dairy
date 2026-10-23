@@ -49,7 +49,7 @@ export default function MarketPriceTicker() {
     }
   }, [selectedRegion])
 
-  const fetchExternalPricesForRegion = async (region: string, currentPrices: PriceData[]) => {
+  const fetchExternalPricesForRegion = async (region: string, currentPrices: PriceData[], forceFetch = false) => {
     setIsFetching(true)
     setFetchError(null)
 
@@ -66,7 +66,7 @@ export default function MarketPriceTicker() {
             p => p.region === region && p.countSize === countSize
           )
 
-          // Only overwrite if it doesn't exist or is not a manual entry
+          // Only overwrite if it doesn't exist or is not a manual entry (unless forceFetch)
           if (existingIdx === -1) {
             updatedList.push({
               id: `ext-${fetchResult.provider}-${region}-${countSize}-${today}`,
@@ -79,7 +79,7 @@ export default function MarketPriceTicker() {
               source: fetchResult.provider,
               externalId: extPrice.metadata?.faoMarket as string || undefined,
             })
-          } else if (updatedList[existingIdx].source !== 'manual') {
+          } else if (forceFetch || updatedList[existingIdx].source !== 'manual') {
             updatedList[existingIdx] = {
               ...updatedList[existingIdx],
               pricePerKg: extPrice.pricePerKg,
@@ -140,6 +140,13 @@ export default function MarketPriceTicker() {
     await fetchExternalPricesForRegion(selectedRegion, prices)
   }
 
+  const handleHardReset = async () => {
+    const confirmReset = confirm('This will reset all manual prices for this region and fetch from FAO. Continue?')
+    if (!confirmReset) return
+    
+    await fetchExternalPricesForRegion(selectedRegion, prices, true)
+  }
+
   const getProjection = (region: string, countSize: CountSize) => {
     const history = prices
       .filter(p => p.region === region && p.countSize === countSize)
@@ -158,13 +165,22 @@ export default function MarketPriceTicker() {
       <div>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xl font-semibold">Market Prices</h3>
-          <button
-            onClick={handleFetchExternalPrices}
-            disabled={isFetching}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-          >
-            {isFetching ? 'Fetching...' : '🌐 Fetch from FAO'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleHardReset}
+              disabled={isFetching}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            >
+              {isFetching ? 'Fetching...' : '🔄 Hard Reset from FAO'}
+            </button>
+            <button
+              onClick={handleFetchExternalPrices}
+              disabled={isFetching}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            >
+              {isFetching ? 'Fetching...' : '🌐 Fetch from FAO'}
+            </button>
+          </div>
         </div>
         <p className="text-gray-600 mb-4">
           Enter today's prices per kg by region. Count sizes from 30 to 100.
