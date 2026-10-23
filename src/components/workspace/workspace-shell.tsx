@@ -9,10 +9,12 @@ import { OFFLINE_QUEUE_EVENT, readQueuedRecords, syncQueuedRecords } from '@/lib
 import { FarmProvider, useFarm } from '@/contexts/farm-context'
 
 const links = [
+  { href: '/dashboard', label: 'Home', glyph: '⌂' },
   { href: '/pond-log', label: 'Pond Log', glyph: '◉' },
   { href: '/feed-trays', label: 'Feed & Trays', glyph: '◈' },
   { href: '/market-prices', label: 'Market Prices', glyph: '＄' },
   { href: '/health', label: 'Shrimp Health', glyph: '✳' },
+  { href: '/settings', label: 'Settings', glyph: '⚙' },
 ]
 
 
@@ -170,20 +172,26 @@ function WorkspaceShellInner({
             <strong>Every detail counts.</strong>
             <span>Better data, healthier ponds.</span>
           </div>
-          <button
-            className="profile-button"
-            type="button"
-            onClick={signOut}
-            disabled={signingOut}
-            title="Sign out"
-          >
-            <span className="profile-avatar">{email.charAt(0).toUpperCase() || 'F'}</span>
-            <span className="profile-copy">
-              <strong>{farmerName || email.split('@')[0] || 'Farm account'}</strong>
-              <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
-            </span>
-            <span className="profile-exit" aria-hidden="true">↗</span>
-          </button>
+          <div className="sidebar-actions">
+            <Link href="/settings" className="sidebar-action-btn" title="Settings">
+              <span aria-hidden="true">⚙</span>
+              <span>Settings</span>
+            </Link>
+            <button
+              className="profile-button"
+              type="button"
+              onClick={signOut}
+              disabled={signingOut}
+              title="Sign out"
+            >
+              <span className="profile-avatar">{email.charAt(0).toUpperCase() || 'F'}</span>
+              <span className="profile-copy">
+                <strong>{farmerName || email.split('@')[0] || 'Farm account'}</strong>
+                <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
+              </span>
+              <span className="profile-exit" aria-hidden="true">↗</span>
+            </button>
+          </div>
           {signOutError && <p className="form-message error-message" role="alert">{signOutError}</p>}
         </div>
       </aside>
@@ -232,7 +240,7 @@ function WorkspaceShellInner({
                     <strong>{p.name}</strong>
                     {p.activeCycle ? (
                       <span className="pill-doc">
-                        {p.activeCycle.doc === 0 ? "New" : `DOC ${p.activeCycle.doc}`}
+                        {p.activeCycle.doc > 0 ? `DOC ${p.activeCycle.doc}` : ''}
                       </span>
                     ) : null}
                   </button>

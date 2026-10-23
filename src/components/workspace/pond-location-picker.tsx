@@ -95,6 +95,85 @@ function loadGoogleMaps(key: string): Promise<GoogleMapsApi> {
   return mapsScriptPromise
 }
 
+// --- New: Caching & Fallback Utilities ---
+
+const LOCATION_CACHE_KEY = 'pond_location_cache_v1'
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+function getCachedLocations(): PondLocation[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(LOCATION_CACHE_KEY)
+    if (!raw) return []
+    const { data, timestamp } = JSON.parse(raw)
+    if (Date.now() - timestamp > CACHE_TTL_MS) {
+      localStorage.removeItem(LOCATION_CACHE_KEY)
+      return []
+    }
+    return data
+  } catch {
+    return []
+  }
+}
+
+function saveToCache(location: PondLocation) {
+  if (typeof window === 'undefined') return
+  try {
+    const cached = getCachedLocations()
+    const filtered = cached.filter(l => l.label !== location.label)
+    const updated = [location, ...filtered].slice(0, 10)
+    localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ data: updated, timestamp: Date.now() }))
+  } catch {
+    // ignore storage errors
+  }
+}
+
+async function searchNominatim(query: string): Promise<PondLocation[]> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', India')}&limit=5&addressdetails=1`
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+    if (!res.ok) throw new Error('Nominatim request failed')
+    const data = await res.json()
+    return data.map((item: any) => ({
+      label: item.display_name.split(',').slice(0, 3).join(', '),
+      latitude: parseFloat(item.lat),
+      longitude: parseFloat(item.lon),
+    }))
+  } catch {
+    return []
+  }
+}
+
+async function geocodeNominatim(lat: number, lng: number): Promise<string | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+    if (!res.ok) return null
+    const data = await res.json()
+    const addr = data.address || {}
+    return [addr.village, addr.town, addr.city, addr.county, addr.state].filter(Boolean).slice(0, 2).join(', ')
+  } catch {
+    return null
+  }
+}
+
+async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 2, baseDelay = 500): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastError = e
+      if (attempt < maxRetries) {
+        const isRateLimit = e instanceof Error && (e.message.includes('OVER_QUERY_LIMIT') || e.message.includes('429'))
+        const delay = isRateLimit ? baseDelay * Math.pow(2, attempt) * 2 : baseDelay * Math.pow(2, attempt)
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
+  }
+  throw lastError
+}
+
 export function PondLocationPicker({
   initialValue,
   onSelect,
@@ -124,17 +203,49 @@ export function PondLocationPicker({
       setError('')
       try {
         const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-        if (!key) throw new Error('Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.local and restart the dev server.')
-        const maps = await loadGoogleMaps(key)
-        const places = await maps.importLibrary('places') as GooglePlacesLibrary
-        const result = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: search,
-          includedRegionCodes: ['in'],
-        })
+        let results: PondLocation[] = []
+        let usedFallback = false
+
+        if (key) {
+          try {
+            const maps = await loadGoogleMaps(key)
+            const places = await maps.importLibrary('places') as GooglePlacesLibrary
+            const result = await retryWithBackoff(() =>
+              places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+                input: search,
+                includedRegionCodes: ['in'],
+              })
+            )
+            results = (result.suggestions ?? []).flatMap((suggestion) =>
+              suggestion.placePrediction
+                ? [{ label: suggestion.placePrediction.text.toString(), latitude: 0, longitude: 0, _prediction: suggestion.placePrediction }]
+                : [],
+            )
+          } catch (googleError) {
+            console.warn('Google Places autocomplete failed, falling back to Nominatim:', googleError)
+            usedFallback = true
+            results = await searchNominatim(search)
+          }
+        } else {
+          results = await searchNominatim(search)
+          usedFallback = true
+        }
+
         if (!controller.signal.aborted) {
-          setSuggestions((result.suggestions ?? []).flatMap((suggestion) =>
-            suggestion.placePrediction ? [suggestion.placePrediction] : [],
-          ))
+          // Convert to GooglePlacePrediction-like objects for compatibility
+          setSuggestions(
+            results.map((r: any) => ({
+              text: { toString: () => r.label },
+              toPlace: () => ({
+                formattedAddress: r.label,
+                location: { lat: () => r.latitude, lng: () => r.longitude },
+                fetchFields: async () => {},
+              }),
+            }))
+          )
+          if (usedFallback) {
+            setNotice('Using OpenStreetMap for location search (Google Places unavailable).')
+          }
         }
       } catch (caught) {
         if (controller.signal.aborted) return
@@ -158,6 +269,7 @@ export function PondLocationPicker({
     setNotice('')
     try {
       await onSelect(location)
+      saveToCache(location)
       setNotice('Location saved for this pond.')
     } catch (caught) {
       setError(locationSearchError(caught))
@@ -171,12 +283,31 @@ export function PondLocationPicker({
     setNotice('')
     try {
       const place = prediction.toPlace()
-      await place.fetchFields({ fields: ['formattedAddress', 'location'] })
-      if (!place.location) throw new Error('Google Maps did not return coordinates for this location.')
+      // Check if this is a Nominatim fallback result (has no fetchFields or lat/lng directly)
+      const hasRealLocation = typeof place.location?.lat === 'function' && place.location.lat() !== 0
+      
+      if (hasRealLocation) {
+        await place.fetchFields({ fields: ['formattedAddress', 'location'] })
+      }
+      
+      const lat = place.location?.lat() ?? 0
+      const lng = place.location?.lng() ?? 0
+      
+      if (!hasRealLocation || lat === 0 || lng === 0) {
+        // Need to geocode via Nominatim
+        const query = prediction.text.toString()
+        const results = await searchNominatim(query)
+        if (results.length > 0) {
+          await saveLocation(results[0])
+          return
+        }
+        throw new Error('Could not find coordinates for this location.')
+      }
+      
       await saveLocation({
         label: place.formattedAddress ?? prediction.text.toString(),
-        latitude: place.location.lat(),
-        longitude: place.location.lng(),
+        latitude: lat,
+        longitude: lng,
       })
     } catch (caught) {
       setError(locationSearchError(caught))
@@ -199,23 +330,38 @@ export function PondLocationPicker({
         })
       })
       const { latitude, longitude } = position.coords
+      
+      // Try Google first if key available, fallback to Nominatim
+      let label: string
       const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-      if (!key) throw new Error('Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in .env.local and restart the dev server.')
-      const maps = await loadGoogleMaps(key)
-      const geocoder = new maps.Geocoder()
-      const { results } = await geocoder.geocode({ location: { lat: latitude, lng: longitude } })
-      const address = results[0]
-      const locality = address?.address_components.find((component) =>
-        component.types.some((type) => ['locality', 'postal_town', 'sublocality', 'administrative_area_level_3'].includes(type)),
-      )?.long_name
-      const state = address?.address_components.find((component) =>
-        component.types.includes('administrative_area_level_1'),
-      )?.long_name
-      await saveLocation({
-        label: [locality, state].filter(Boolean).join(', ') || address?.formatted_address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-        latitude,
-        longitude,
-      })
+      
+      if (key) {
+        try {
+          const maps = await loadGoogleMaps(key)
+          const geocoder = new maps.Geocoder()
+          const { results } = await retryWithBackoff(() =>
+            geocoder.geocode({ location: { lat: latitude, lng: longitude } })
+          )
+          const address = results[0]
+          const locality = address?.address_components.find((component) =>
+            component.types.some((type) => ['locality', 'postal_town', 'sublocality', 'administrative_area_level_3'].includes(type)),
+          )?.long_name
+          const state = address?.address_components.find((component) =>
+            component.types.includes('administrative_area_level_1'),
+          )?.long_name
+          label = [locality, state].filter(Boolean).join(', ') || address?.formatted_address || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+        } catch (googleError) {
+          console.warn('Google reverse geocoding failed, falling back to Nominatim:', googleError)
+          const nominatimLabel = await geocodeNominatim(latitude, longitude)
+          label = nominatimLabel || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+          setNotice('Using OpenStreetMap for address lookup (Google Maps unavailable).')
+        }
+      } else {
+        const nominatimLabel = await geocodeNominatim(latitude, longitude)
+        label = nominatimLabel || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+      }
+      
+      await saveLocation({ label, latitude, longitude })
     } catch (caught) {
       const geolocationCode = typeof caught === 'object' && caught !== null
         && 'code' in caught && typeof caught.code === 'number'
@@ -269,6 +415,36 @@ export function PondLocationPicker({
         />
         <span className="telugu-hint" lang="te">వాతావరణ సమాచారం కోసం ఊరు లేదా దగ్గరలోని ప్రాంతం వెతకండి, లేదా మీ స్థానం వాడండి.</span>
       </label>
+      {(() => {
+        const recent = getCachedLocations()
+        if (recent.length > 0 && !chosenLabel && query.trim().length < 3) {
+          return (
+            <div className="recent-locations" style={{ marginTop: 8 }}>
+              <p style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>Recent locations</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {recent.map((loc, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => void saveLocation(loc)}
+                    style={{
+                      padding: '6px 12px',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 8,
+                      background: 'var(--color-surface)',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                  >
+                    {loc.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        }
+        return null
+      })()}
       <Button type="button" className="pond-location-button" onClick={useCurrentLocation} disabled={busy}>
         {busy ? 'Finding location…' : '◎ Use my current location'}
       </Button>
