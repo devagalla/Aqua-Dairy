@@ -17,6 +17,14 @@ const links = [
   { href: '/settings', label: 'Settings', glyph: '⚙' },
 ]
 
+const mobileLinks = [
+  { href: '/pond-log', label: 'Pond Log', glyph: '◉' },
+  { href: '/feed-trays', label: 'Feed & Trays', glyph: '◈' },
+  { href: '/market-prices', label: 'Market Prices', glyph: '＄' },
+  { href: '/health', label: 'Shrimp Health', glyph: '✳' },
+  { href: '/settings', label: 'Settings', glyph: '⚙' },
+]
+
 
 export function WorkspaceShell({
   children,
@@ -258,7 +266,7 @@ function WorkspaceShellInner({
         )}
       </div>
       <nav className="mobile-workspace-nav" aria-label="Farm management">
-        {links.map((link) => (
+        {mobileLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}

@@ -644,6 +644,8 @@ input:focus, select:focus {
   .mobile-workspace-nav a > span { font-size: 17px; }
   .mobile-workspace-nav a.active { color: var(--sea); font-weight: 800; }
   .mobile-workspace-nav a.active > span { transform: translateY(-2px); }
+  .mobile-workspace-nav button.mobile-nav-more { display: grid; min-width: 52px; justify-items: center; gap: 3px; color: #8c9b91; font-size: 8px; background: none; border: none; cursor: pointer; padding: 0; }
+  .mobile-workspace-nav button.mobile-nav-more > span { font-size: 17px; }
   .dashboard-hero { min-height: 250px; grid-template-columns: 1fr; }
   .hero-copy { align-self: start; padding: 25px 22px; }
   .hero-copy h1 { max-width: 310px; font-size: 29px; }
