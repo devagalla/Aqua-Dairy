@@ -84,13 +84,13 @@ export function useGrossCropValue(
         const daysDiff = (Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24)
         setIsStale(daysDiff > 3)
       } else {
-        // Initialize with sample data
-        const samplePrices: PriceData[] = ([30, 40, 50, 60, 70, 80, 90, 100] as CountSize[]).map(count => ({
+        // Initialize with deterministic sample data (no random to avoid hydration mismatch)
+        const samplePrices: PriceData[] = ([30, 40, 50, 60, 70, 80, 90, 100] as CountSize[]).map((count, index) => ({
           id: `${region}-${count}`,
           region,
           countSize: count,
-          pricePerKg: 350 + Math.random() * 100,
-          trend: (['up', 'stable', 'down'] as Trend[])[Math.floor(Math.random() * 3)],
+          pricePerKg: 350 + (index * 12) % 100, // Deterministic pseudo-random
+          trend: (['up', 'stable', 'down'] as Trend[])[index % 3],
           date: new Date().toISOString().split('T')[0],
         }))
         setPrices(samplePrices)

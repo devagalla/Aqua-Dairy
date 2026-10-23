@@ -192,7 +192,7 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
                   <div className="weather-days">
                     {forecast.data.daily.time.slice(0, 7).map((date, index) => (
                       <div key={date}>
-                        <strong>{index === 0 ? 'Today' : new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })}</strong>
+                        <strong>{index === 0 ? 'Today' : new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short' })}</strong>
                         <span>{weatherDescription(forecast.data!.daily.weather_code[index])}</span>
                         <small>{Math.round(forecast.data!.daily.temperature_2m_max[index])}° / {Math.round(forecast.data!.daily.temperature_2m_min[index])}°</small>
                         <small>{forecast.data!.daily.precipitation_probability_max[index]}% rain</small>

@@ -336,7 +336,7 @@ export default function PondsPage() {
                     <div><strong>{pond.name}</strong><span>{pond.farm?.name}{pond.area_acres ? ` · ${pond.area_acres} acres` : ''}{pond.locality ? ` · ${pond.locality}` : ''}</span></div>
                     <div className="pond-cycle-list">{pondCycles.length ? pondCycles.map((cycle) => (
                       <div key={cycle.id} className={`cycle-chip${cycle.status === 'active' && cycle.target_harvest_days ? ' cycle-chip-progress' : ''}`}>
-                        <span>{cycle.status === 'active' ? 'Active' : 'Completed'} · PL {cycle.pl ?? '—'} · {cycle.seed_stocked.toLocaleString()} stocked · {cycle.stocking_date}{cycle.completed_at ? ` · ended ${cycle.completed_at}` : ''}</span>
+                        <span>{cycle.status === 'active' ? 'Active' : 'Completed'} · PL {cycle.pl ?? '—'} · {cycle.seed_stocked.toLocaleString('en-IN')} stocked · {cycle.stocking_date}{cycle.completed_at ? ` · ended ${cycle.completed_at}` : ''}</span>
                         {cycle.status === 'active' && cycle.target_harvest_days && (() => {
                           const start = Date.parse(`${cycle.stocking_date}T00:00:00Z`)
                           const day = Math.max(0, Math.floor((Date.now() - start) / 86_400_000) + 1)

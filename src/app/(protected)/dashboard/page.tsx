@@ -129,7 +129,7 @@ export default function Dashboard() {
         <article className="stat-card animate-in animate-delay-3">
           <span className="stat-label">Latest pH <span className="eyebrow-te" lang="te">నీటి కొలత</span></span>
           <strong>{overview.loading ? '—' : overview.latestWater?.ph ?? '—'}</strong>
-          <span className="stat-note">{overview.latestWater ? `checked ${new Date(overview.latestWater.logged_at).toLocaleDateString()}` : 'add your first water reading'}</span>
+          <span className="stat-note">{overview.latestWater ? `checked ${new Date(overview.latestWater.logged_at).toLocaleDateString('en-IN')}` : 'add your first water reading'}</span>
           <span className="stat-sparkline violet-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
         <article className="stat-card animate-in animate-delay-4">

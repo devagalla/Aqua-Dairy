@@ -114,8 +114,8 @@ export default function GrowthTracker() {
         <div>
           <span className="eyebrow">GROWTH TRACKER</span>
           <h1>{pondConfig.pondName} - Growth Analytics</h1>
-          <p>Tracking {samplingRecords.length > 0 ? (samplingRecords[samplingRecords.length - 1].doc === 0 ? "New" : `DOC ${samplingRecords[samplingRecords.length - 1].doc}`) : "New"} • {pondConfig.seedCount.toLocaleString()} seeds</p>
-          <p className="telugu-subtitle" lang="te">ప్రస్తుతం ఉన్న రోజులు: {samplingRecords.length > 0 ? (samplingRecords[samplingRecords.length - 1].doc === 0 ? "కొత్తది" : `${samplingRecords[samplingRecords.length - 1].doc}`) : "కొత్తది"} • {pondConfig.seedCount.toLocaleString()} రొయ్య పిల్లలు</p>
+          <p>Tracking {samplingRecords.length > 0 ? (samplingRecords[samplingRecords.length - 1].doc === 0 ? "New" : `DOC ${samplingRecords[samplingRecords.length - 1].doc}`) : "New"} • {pondConfig.seedCount.toLocaleString('en-IN')} seeds</p>
+          <p className="telugu-subtitle" lang="te">ప్రస్తుతం ఉన్న రోజులు: {samplingRecords.length > 0 ? (samplingRecords[samplingRecords.length - 1].doc === 0 ? "కొత్తది" : `${samplingRecords[samplingRecords.length - 1].doc}`) : "కొత్తది"} • {pondConfig.seedCount.toLocaleString('en-IN')} రొయ్య పిల్లలు</p>
         </div>
         <span className="heading-orbit" aria-hidden="true">📈</span>
       </div>
@@ -612,7 +612,7 @@ function HarvestOptimizer({
         </div>
         <div className="bg-white p-3 rounded border">
           <p className="text-xs text-gray-500">Projected Revenue</p>
-          <p className="text-xl font-bold text-amber-700">₹{hp.projectedRevenue.toLocaleString()}</p>
+          <p className="text-xl font-bold text-amber-700">₹{hp.projectedRevenue.toLocaleString('en-IN')}</p>
         </div>
       </div>
 
@@ -631,7 +631,7 @@ function HarvestOptimizer({
       <div className="mt-3 p-3 bg-green-100 rounded border border-green-300">
         <p className="text-sm text-green-800">
           <strong>Recommendation:</strong> Harvest around <strong>DOC {hp.optimalDay}</strong> ({hp.daysToHarvest} days from now)
-          when shrimp reach ~{hp.optimalCountSize} count/kg for maximum revenue of ~₹{hp.projectedRevenue.toLocaleString()}.
+          when shrimp reach ~{hp.optimalCountSize} count/kg for maximum revenue of ~₹{hp.projectedRevenue.toLocaleString('en-IN')}.
         </p>
       </div>
     </div>

@@ -764,8 +764,8 @@ export function RecordWorkspace({ kind }: { kind: RecordKind }) {
                     <div className="journal-copy">
                       <strong>{recentTitle(kind, record)}</strong>
                       <span>{kind === 'feed' && record.entry_mode === 'daily_summary'
-                        ? new Date(String(record[page.dateColumn])).toLocaleDateString()
-                        : new Date(String(record[page.dateColumn])).toLocaleString()}</span>
+                        ? new Date(String(record[page.dateColumn])).toLocaleDateString('en-IN')
+                        : new Date(String(record[page.dateColumn])).toLocaleString('en-IN')}</span>
                     </div>
                     <span className="journal-value">{recentValue(kind, record)}</span>
                     {typeof record._offline_status === 'string' && (

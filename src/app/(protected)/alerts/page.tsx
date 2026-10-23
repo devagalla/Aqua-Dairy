@@ -102,7 +102,7 @@ export default function AlertsPage() {
                 </div>
                 {alert.water_log_id && <Link href="/water" className="text-link">View water log <span aria-hidden="true">→</span></Link>}
                 {alert.acknowledged_at ? (
-                  <span className="alert-acknowledged" role="status">Acknowledged · {new Date(alert.acknowledged_at).toLocaleDateString()}</span>
+                  <span className="alert-acknowledged" role="status">Acknowledged · {new Date(alert.acknowledged_at).toLocaleDateString('en-IN')}</span>
                 ) : (
                   <Button
                     type="button"

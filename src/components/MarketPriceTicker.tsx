@@ -196,7 +196,7 @@ export default function MarketPriceTicker() {
 
         {lastFetchTime && (
           <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-            <p className="text-blue-800 text-sm">Last external sync: {new Date(lastFetchTime).toLocaleString()}</p>
+            <p className="text-blue-800 text-sm">Last external sync: {new Date(lastFetchTime).toLocaleString('en-IN')}</p>
           </div>
         )}
 
