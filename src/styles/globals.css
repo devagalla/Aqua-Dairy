@@ -638,6 +638,8 @@ input:focus, select:focus {
   .workspace-main { margin-left: 0; }
   .workspace-topbar { height: auto; min-height: 58px; padding: 7px 18px; }
   .topbar-eyebrow { display: none; }
+  .mobile-brand-lockup { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 8px; color: #1a3a2a; font-size: 14px; font-weight: 600; text-decoration: none; }
+  .mobile-brand-lockup .brand-mark { font-size: 16px; }
   .workspace-content { padding: 25px 17px 95px; }
   .mobile-workspace-nav { position: fixed; z-index: 8; right: 0; bottom: 0; left: 0; display: flex; min-height: 63px; align-items: center; justify-content: space-around; border-top: 1px solid #e1e9dd; background: rgba(255,254,249,.96); padding: 4px 5px max(4px, env(safe-area-inset-bottom)); backdrop-filter: blur(14px); }
   .mobile-workspace-nav a { display: grid; min-width: 52px; justify-items: center; gap: 3px; color: #8c9b91; font-size: 8px; }

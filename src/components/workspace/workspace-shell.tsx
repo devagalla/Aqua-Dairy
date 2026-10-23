@@ -206,6 +206,10 @@ function WorkspaceShellInner({
       <div className="workspace-main">
         <header className="workspace-topbar">
           <div>
+            <Link href="/dashboard" className="mobile-brand-lockup">
+              <span className="brand-mark">a</span>
+              <span>Aqua<span className="brand-light">Dairy</span></span>
+            </Link>
             <span className="topbar-eyebrow">
               {farmerName ? `Good to see you, ${farmerName}` : 'YOUR FARM, IN FOCUS'}
               <span className="telugu-subtitle ml-2" lang="te">{farmerName ? `${farmerName} గారు, స్వాగతం` : ''}</span>
