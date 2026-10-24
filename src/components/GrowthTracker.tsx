@@ -5,7 +5,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, Ca
 import { calculateADG, detectStuntedGrowth, calculateBiomassKg } from '@/utils/growthMath'
 import { estimateHarvestCount, nearestCountTier, projectPrice, type PriceProjection } from '@/utils/pricePrediction'
 import { fetchMarketPrice, priceRegistry } from '@/lib/price-providers'
-import * as benchmarksData from '@/data/shrimpGrowthBenchmarks.json'
+import benchmarksData from '@/data/shrimpGrowthBenchmarks.json'
 
 interface Benchmark {
   doc: number
