@@ -25,6 +25,15 @@ const mobileLinks = [
   { href: '/settings', label: 'Settings', glyph: '⚙' },
 ]
 
+// Simple Badge component for DOC display
+function Badge({ children, variant = 'outline', className = '' }: { children: ReactNode; variant?: 'outline' | 'solid'; className?: string }) {
+  const baseStyles = 'inline-flex items-center px-2 py-0.5 text-xs font-medium rounded'
+  const variantStyles = variant === 'outline' 
+    ? 'border border-gray-300 bg-white text-gray-700' 
+    : 'bg-sea text-white'
+  return <span className={`${baseStyles} ${variantStyles} ${className}`}>{children}</span>
+}
+
 
 export function WorkspaceShell({
   children,
@@ -180,36 +189,32 @@ function WorkspaceShellInner({
             <strong>Every detail counts.</strong>
             <span>Better data, healthier ponds.</span>
           </div>
-          <div className="sidebar-actions">
-            <Link href="/settings" className="sidebar-action-btn" title="Settings">
-              <span aria-hidden="true">⚙</span>
-              <span>Settings</span>
-            </Link>
-            <button
-              className="profile-button"
-              type="button"
-              onClick={signOut}
-              disabled={signingOut}
-              title="Sign out"
-            >
-              <span className="profile-avatar">{email.charAt(0).toUpperCase() || 'F'}</span>
-              <span className="profile-copy">
-                <strong>{farmerName || email.split('@')[0] || 'Farm account'}</strong>
-                <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
-              </span>
-              <span className="profile-exit" aria-hidden="true">↗</span>
-            </button>
-          </div>
+          <button
+            className="profile-button"
+            type="button"
+            onClick={signOut}
+            disabled={signingOut}
+            title="Sign out"
+          >
+            <span className="profile-avatar">{email.charAt(0).toUpperCase() || 'F'}</span>
+            <span className="profile-copy">
+              <strong>{farmerName || email.split('@')[0] || 'Farm account'}</strong>
+              <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
+            </span>
+            <span className="profile-exit" aria-hidden="true">↗</span>
+          </button>
           {signOutError && <p className="form-message error-message" role="alert">{signOutError}</p>}
         </div>
       </aside>
       <div className="workspace-main">
         <header className="workspace-topbar">
-          <div>
-            <Link href="/dashboard" className="mobile-brand-lockup">
+          <div className="topbar-brand">
+            <Link href="/dashboard" className="brand-lockup">
               <span className="brand-mark">a</span>
               <span>Aqua<span className="brand-light">Dairy</span></span>
             </Link>
+          </div>
+          <div className="topbar-location">
             <span className="topbar-eyebrow">
               {farmerName ? `Good to see you, ${farmerName}` : 'YOUR FARM, IN FOCUS'}
               <span className="telugu-subtitle ml-2" lang="te">{farmerName ? `${farmerName} గారు, స్వాగతం` : ''}</span>
@@ -230,35 +235,32 @@ function WorkspaceShellInner({
                       : 'All records synced'}
             </span>
           </div>
-          <Link href="/ponds" className="topbar-setup">
-            <span aria-hidden="true">＋</span> Ponds &amp; cycles
-          </Link>
+          <div className="topbar-actions">
+            <Link href="/ponds" className="topbar-setup">
+              <span aria-hidden="true">＋</span> Ponds & cycles
+            </Link>
+          </div>
         </header>
 
         {ponds.length > 0 && (
           <div className="global-pond-switcher" role="region" aria-label="Global Pond Switcher">
-            <span className="switcher-label">Active Pond:</span>
-            <div className="switcher-pills">
-              {ponds.map((p) => {
-                const isActive = p.id === activePondId
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setActivePondId(p.id)}
-                    className={`switcher-pill${isActive ? ' active' : ''}`}
-                  >
-                    <span className="pill-dot" aria-hidden="true" />
-                    <strong>{p.name}</strong>
-                    {p.activeCycle ? (
-                      <span className="pill-doc">
-                        {p.activeCycle.doc > 0 ? `DOC ${p.activeCycle.doc}` : ''}
-                      </span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
+            <label className="switcher-select-wrapper" htmlFor="pond-switcher">
+              <span className="switcher-label">Active Pond:</span>
+              <select
+                id="pond-switcher"
+                value={activePondId ?? ''}
+                onChange={(e) => setActivePondId(e.target.value || null)}
+                className="switcher-select"
+              >
+                <option value="">Select a pond</option>
+                {ponds.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} {p.activeCycle && p.activeCycle.doc > 0 ? `(DOC ${p.activeCycle.doc})` : ''}
+                  </option>
+                ))}
+              </select>
+              <span className="switcher-select-arrow" aria-hidden="true">▼</span>
+            </label>
           </div>
         )}
 

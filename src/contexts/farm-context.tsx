@@ -10,7 +10,7 @@ export interface FarmContextType {
   ponds: PondSummary[]
   activePondId: string | null
   activePond: PondSummary | null
-  setActivePondId: (id: string) => void
+  setActivePondId: (id: string | null) => void
   loading: boolean
   refresh: () => Promise<void>
 }
@@ -60,10 +60,14 @@ export function FarmProvider({
   const [location, setLocation] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
-  const setActivePondId = useCallback((id: string) => {
+  const setActivePondId = useCallback((id: string | null) => {
     setActivePondIdState(id)
     try {
-      localStorage.setItem(STORAGE_ACTIVE_POND_KEY, id)
+      if (id) {
+        localStorage.setItem(STORAGE_ACTIVE_POND_KEY, id)
+      } else {
+        localStorage.removeItem(STORAGE_ACTIVE_POND_KEY)
+      }
     } catch {
       // localStorage disabled / private mode
     }

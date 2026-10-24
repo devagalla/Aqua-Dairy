@@ -73,7 +73,28 @@ function weatherDescription(code: number) {
   return 'Weather update'
 }
 
-export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
+// Compact card for ponds without coordinates
+function PondWeatherUnconfigured({ pond }: { pond: WeatherPond }) {
+  return (
+    <article className="card-surface pond-weather-card pond-weather-card--compact">
+      <div className="weather-card-heading">
+        <div>
+          <strong>{pond.name}</strong>
+          <span>{pond.locality ? `${pond.locality}, ${pond.farmName}` : pond.farmName}</span>
+        </div>
+        <span className="weather-location-badge" aria-label="Location not set">📍</span>
+      </div>
+      <div className="weather-empty">
+        <p className="quiet-state">Location not set — weather unavailable</p>
+        <Link href={`/ponds?edit=${pond.id}`} className="btn-set-location">
+          <span aria-hidden="true">📍</span> Set Location
+        </Link>
+      </div>
+    </article>
+  )
+}
+
+export function PondWeather({ ponds, activePondId }: { ponds: WeatherPond[]; activePondId?: string | null }) {
   const [forecastByPond, setForecastByPond] = useState<Record<string, ForecastState>>({})
 
   useEffect(() => {
@@ -97,82 +118,86 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
       forecastUrl.searchParams.set('forecast_days', '7')
 
       const forecastResult = await fetch(forecastUrl, { cache: 'no-store' }).then(async (response) => {
-        if (!response.ok) throw new Error(`Forecast unavailable (${response.status}).`)
-        return await response.json() as WeatherResponse
-      }).then(
-        (data) => ({ status: 'fulfilled' as const, value: data }),
-        (reason: unknown) => ({ status: 'rejected' as const, reason }),
-      )
+        if (!response.ok) throw new Error(`Forecast unavailable (${response.status})`)
+        return response.json() as Promise<WeatherResponse>
+      })
 
-      let historyResult: PromiseSettledResult<HistoricalWeatherResponse>
-      if (forecastResult.status === 'fulfilled') {
-        const historyDate = previousLocalDate(forecastResult.value.daily.time[0])
-        const historyUrl = new URL('https://archive-api.open-meteo.com/v1/archive')
-        historyUrl.searchParams.set('latitude', String(pond.latitude))
-        historyUrl.searchParams.set('longitude', String(pond.longitude))
-        historyUrl.searchParams.set('hourly', 'temperature_2m,precipitation,cloud_cover,shortwave_radiation')
-        historyUrl.searchParams.set('start_date', historyDate)
-        historyUrl.searchParams.set('end_date', historyDate)
-        historyUrl.searchParams.set('timezone', 'auto')
-        historyResult = await fetch(historyUrl, { cache: 'no-store' }).then(async (response) => {
-          if (!response.ok) throw new Error(`Historical weather unavailable (${response.status}).`)
-          return await response.json() as HistoricalWeatherResponse
-        }).then(
-          (data) => ({ status: 'fulfilled' as const, value: data }),
-          (reason: unknown) => ({ status: 'rejected' as const, reason }),
-        )
-      } else {
-        historyResult = { status: 'rejected', reason: 'History unavailable because the forecast could not be loaded.' }
-      }
+      const historyUrl = new URL('https://api.open-meteo.com/v1/forecast')
+      historyUrl.searchParams.set('latitude', String(pond.latitude))
+      historyUrl.searchParams.set('longitude', String(pond.longitude))
+      const yesterday = previousLocalDate(forecastResult.current.time.slice(0, 10))
+      historyUrl.searchParams.set('start_date', yesterday)
+      historyUrl.searchParams.set('end_date', yesterday)
+      historyUrl.searchParams.set('hourly', 'temperature_2m,precipitation,cloud_cover,shortwave_radiation')
+      historyUrl.searchParams.set('timezone', 'auto')
+
+      const historyResult = await fetch(historyUrl, { cache: 'no-store' }).then(async (response) => {
+        if (!response.ok) throw new Error(`Historical data unavailable (${response.status})`)
+        return response.json() as Promise<HistoricalWeatherResponse>
+      })
 
       if (!cancelled) {
-        setForecastByPond((current) => ({
-          ...current,
-          [pond.id]: {
-            loading: false,
-            historyLoading: false,
-            ...(forecastResult.status === 'fulfilled'
-              ? { data: forecastResult.value }
-              : { error: forecastResult.reason instanceof Error ? forecastResult.reason.message : 'Could not load this forecast.' }),
-            ...(historyResult.status === 'fulfilled'
-              ? { history: historyResult.value }
-              : { historyError: historyResult.reason instanceof Error ? historyResult.reason.message : 'Could not load historical weather.' }),
-          },
+        setForecastByPond((prev) => ({
+          ...prev,
+          [pond.id]: { loading: false, data: forecastResult, historyLoading: false, history: historyResult },
         }))
       }
     }
 
-    for (const pond of locatedPonds) void loadForecast(pond)
-    return () => { cancelled = true }
+    locatedPonds.forEach((pond) => loadForecast(pond))
+
+    return () => {
+      cancelled = true
+    }
   }, [ponds])
 
-  if (ponds.length === 0) return null
+  // Sort ponds: active pond first (if located), then other located ponds, then unconfigured ponds
+  const activePond = ponds.find(p => p.id === activePondId)
+  const otherLocatedPonds = ponds.filter(
+    p => p.id !== activePondId && p.latitude !== null && p.longitude !== null
+  )
+  const unconfiguredPonds = ponds.filter(p => p.latitude === null || p.longitude === null)
+
+  const displayPonds = [
+    ...(activePond && activePond.latitude !== null && activePond.longitude !== null ? [activePond] : []),
+    ...otherLocatedPonds,
+    ...unconfiguredPonds,
+  ]
 
   return (
     <section className="pond-weather-section">
       <div className="section-heading">
-        <div><span className="eyebrow">WEATHER NEAR YOUR PONDS</span><h2>Local conditions &amp; forecast</h2><span className="telugu-subtitle" lang="te">మీ చెరువు దగ్గరి ప్రస్తుత వాతావరణం, రాబోయే ఏడు రోజుల అంచనా.</span></div>
-        <span className="section-meta">OPEN-METEO&nbsp; ↗</span>
+        <div><span className="eyebrow">WEATHER WATCH</span><h2>Pond Weather</h2></div>
+        <span className="section-meta">LIVE CONDITIONS + 7-DAY OUTLOOK&nbsp; ↘</span>
       </div>
       <div className="pond-weather-grid">
-        {ponds.map((pond) => {
+        {displayPonds.map((pond) => {
+          const isActive = pond.id === activePondId
+          const hasCoordinates = pond.latitude !== null && pond.longitude !== null
+
+          if (!hasCoordinates) {
+            return <PondWeatherUnconfigured key={pond.id} pond={pond} />
+          }
+
           const forecast = forecastByPond[pond.id]
+
           return (
-            <article className="card-surface pond-weather-card" key={pond.id}>
+            <article
+              key={pond.id}
+              className={`card-surface pond-weather-card${isActive ? ' pond-weather-card--active' : ''}`}
+            >
               <div className="weather-card-heading">
-                <div><strong>{pond.name}</strong><span>{pond.farmName}{pond.locality ? ` · ${pond.locality}` : ''}</span></div>
-                <span aria-hidden="true">☼</span>
-              </div>
-              {pond.latitude === null || pond.longitude === null ? (
-                <div className="weather-empty">
-                  <p>Add this pond&apos;s location to see local weather and temperature.</p>
-                  <Link href="/ponds">Set pond location <span aria-hidden="true">→</span></Link>
+                <div>
+                  <strong>{pond.name}</strong>
+                  <span>{pond.locality ? `${pond.locality}, ${pond.farmName}` : pond.farmName}</span>
                 </div>
-              ) : !forecast || forecast.loading ? (
-                <p className="quiet-state">Loading local forecast…</p>
-              ) : forecast.error ? (
+                <span aria-hidden="true">☀</span>
+              </div>
+              {forecast?.loading ? (
+                <p className="quiet-state">Loading weather…</p>
+              ) : forecast?.error ? (
                 <p className="form-message error-message" role="alert">{forecast.error}</p>
-              ) : forecast.data ? (
+              ) : forecast?.data ? (
                 <>
                   <div className="weather-current">
                     <strong>{Math.round(forecast.data.current.temperature_2m)}°</strong>
@@ -227,7 +252,7 @@ export function PondWeather({ ponds }: { ponds: WeatherPond[] }) {
           )
         })}
       </div>
-      <p className="weather-attribution">Current conditions and forecast by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>, refreshed on load. The expandable hourly view shows yesterday&apos;s historical weather for the saved pond location.</p>
+      <p className="weather-attribution">Current conditions and forecast by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>, refreshed on load. The expandable hourly view shows yesterday's historical weather for the saved pond location.</p>
     </section>
   )
 }

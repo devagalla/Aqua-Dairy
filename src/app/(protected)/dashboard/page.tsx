@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { PondWeather, type WeatherPond } from '@/components/workspace/pond-weather'
 import { supabase } from '@/lib/supabase/client'
+import { useFarm } from '@/contexts/farm-context'
 
 type Overview = {
   farmName: string
@@ -27,6 +28,7 @@ const shortcuts = [
 ]
 
 export default function Dashboard() {
+  const { activePondId } = useFarm()
   const [overview, setOverview] = useState<Overview>({
     farmName: '',
     pondCount: 0,
@@ -109,8 +111,6 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <PondWeather ponds={overview.weatherPonds} />
-
       {overview.error && <p className="form-message error-message" role="alert">{overview.error}</p>}
 
       <section className="stats-grid" aria-label="Farm summary">
@@ -139,6 +139,8 @@ export default function Dashboard() {
           <span className="stat-sparkline amber-spark" aria-hidden="true">⌁⌁⌁</span>
         </article>
       </section>
+
+      <PondWeather ponds={overview.weatherPonds} activePondId={activePondId} />
 
       <section className="section-heading">
         <div><span className="eyebrow">A GOOD DAY STARTS WITH A GOOD LOG</span><h2>What would you like to record?</h2></div>
