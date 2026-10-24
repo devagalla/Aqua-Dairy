@@ -353,7 +353,10 @@ function SamplingForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-2">Day of Culture (DOC)</label>
+        <label className="block text-sm font-medium mb-2">
+          Day of Culture (DOC)
+          <span className="text-xs text-gray-500 block telugu-label" lang="te">కల్చర్ రోజు (DOC) - ఎండోధాన్యం తర్వాత రోజులు లెక్క</span>
+        </label>
         <input
           name="doc"
           type="number"
@@ -363,10 +366,14 @@ function SamplingForm({
           className="w-full min-h-[56px] p-3 border border-gray-300 rounded-lg text-lg"
           required
         />
+        <p className="text-xs text-gray-500 mt-1 telugu-example" lang="te">ఉదా: స్టాకింగ్ తర్వాత 30వ రోజు అయితే 30 నమోదు చేయండి</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Mean Body Weight (MBW) grams</label>
+        <label className="block text-sm font-medium mb-2">
+          Mean Body Weight (MBW) grams
+          <span className="text-xs text-gray-500 block telugu-label" lang="te">సగటు శరీర బరువు (MBW) గ్రాములు</span>
+        </label>
         <input
           name="mbwGrams"
           type="number"
@@ -378,10 +385,14 @@ function SamplingForm({
           placeholder="Average weight per shrimp in grams"
           required
         />
+        <p className="text-xs text-gray-500 mt-1 telugu-example" lang="te">ఉదా: కొన్ని రొయ్యలను తూకం పెట్టి సగటు బరువు తెలుసుకోండి</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Cumulative Feed (kg)</label>
+        <label className="block text-sm font-medium mb-2">
+          Cumulative Feed (kg)
+          <span className="text-xs text-gray-500 block telugu-label" lang="te">మొత్తం ఫీడ్ (కిలోలు)</span>
+        </label>
         <input
           name="cumulativeFeedKg"
           type="number"
@@ -393,10 +404,14 @@ function SamplingForm({
           placeholder="Total feed used to date"
           required
         />
+        <p className="text-xs text-gray-500 mt-1 telugu-example" lang="te">ఉదా: ప్రారంభం నుండి ఇప్పటి వరకు ఇచ్చిన మొత్తం ఫీడ్ కిలోలలో</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Estimated Survival %</label>
+        <label className="block text-sm font-medium mb-2">
+          Estimated Survival %
+          <span className="text-xs text-gray-500 block telugu-label" lang="te">అంచనా జీవనశాతం %</span>
+        </label>
         <input
           name="survivalPercent"
           type="number"
@@ -408,6 +423,7 @@ function SamplingForm({
           className="w-full min-h-[56px] p-3 border border-gray-300 rounded-lg text-lg"
           placeholder="Estimated survival percentage"
         />
+        <p className="text-xs text-gray-500 mt-1 telugu-example" lang="te">ఉదా: మొక్కలు 1000 ఉంటే 850 బ్రతికితే 85% నమోదు చేయండి</p>
       </div>
 
       <button
@@ -657,11 +673,30 @@ function MetricsDashboard({
     [latestRecord?.cumulativeFeedKg, biomass, pondConfig]
   )
 
+  const [currentPrice, setCurrentPrice] = useState<number>(350)
+  const [priceLoading, setPriceLoading] = useState(true)
+
+  useEffect(() => {
+    const loadPrice = async () => {
+      try {
+        const prices = await fetchMarketPrice('Bhimavaram', 40)
+        if (prices.length > 0) {
+          setCurrentPrice(prices[0].pricePerKg)
+        }
+      } catch (e) {
+        console.error('Failed to load market price', e)
+      } finally {
+        setPriceLoading(false)
+      }
+    }
+    void loadPrice()
+  }, [])
+
   const gcvm = useMemo(() =>
     pondConfig && latestRecord
-      ? biomass * 350 // Assuming Rs 350/kg price - in reality this would come from market prices
+      ? biomass * currentPrice
       : 0,
-    [biomass, pondConfig, latestRecord]
+    [biomass, pondConfig, latestRecord, currentPrice]
   )
 
   const stuntedCheck = useMemo(() =>
@@ -701,7 +736,8 @@ function MetricsDashboard({
       <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
         <h4 className="font-semibold mb-2">Gross Crop Value</h4>
         <p className="text-2xl font-bold text-amber-800">₹{gcvm.toFixed(0)}</p>
-        <p className="text-sm text-gray-600">Estimated value at harvest (at ₹350/kg)</p>
+        <p className="text-sm text-gray-600">Estimated value at harvest (at ₹{currentPrice.toFixed(0)}/kg current market price)</p>
+        {priceLoading && <p className="text-xs text-gray-500 mt-1">Loading current price...</p>}
       </div>
 
       <HarvestOptimizer
