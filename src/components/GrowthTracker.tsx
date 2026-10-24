@@ -4,8 +4,9 @@ import { useState, useMemo, useEffect } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'
 import { calculateADG, detectStuntedGrowth, calculateBiomassKg } from '@/utils/growthMath'
 import { estimateHarvestCount, nearestCountTier, projectPrice, type PriceProjection } from '@/utils/pricePrediction'
-import { fetchMarketPrice, priceRegistry } from '@/lib/price-providers'
+import { fetchMarketPrice, priceRegistry, type PriceDataPoint } from '@/lib/price-providers'
 import benchmarksData from '@/data/shrimpGrowthBenchmarks.json'
+import { CountSize } from '@/lib/price-providers/types'
 
 interface Benchmark {
   doc: number
@@ -34,6 +35,8 @@ export default function GrowthTracker() {
   const { activePond, ponds } = useFarm()
   const [localPondConfig, setLocalPondConfig] = useState<PondConfig | null>(null)
   const [samplingRecords, setSamplingRecords] = useState<SamplingRecord[]>([])
+  const [marketRegion, setMarketRegion] = useState('Bhimavaram')
+  const [countSize, setCountSize] = useState<CountSize>(40)
 
   const pondConfig = useMemo(() => {
     if (activePond) {
@@ -116,6 +119,40 @@ export default function GrowthTracker() {
           <h1>{pondConfig.pondName} - Growth Analytics</h1>
           <p>Tracking {activePond?.activeCycle?.doc !== undefined ? (activePond.activeCycle.doc === 0 ? "New" : `DOC ${activePond.activeCycle.doc}`) : (samplingRecords.length > 0 ? (samplingRecords[samplingRecords.length - 1].doc === 0 ? "New" : `DOC ${samplingRecords[samplingRecords.length - 1].doc}`) : "New")} • {pondConfig.seedCount.toLocaleString('en-IN')} seeds</p>
           <p className="telugu-subtitle" lang="te">ప్రస్తుతం ఉన్న రోజులు: {activePond?.activeCycle?.doc !== undefined ? (activePond.activeCycle.doc === 0 ? "కొత్తది" : `${activePond.activeCycle.doc}`) : (samplingRecords.length > 0 ? (samplingRecords[samplingRecords.length - 1].doc === 0 ? "కొత్తది" : `${samplingRecords[samplingRecords.length - 1].doc}`) : "కొత్తది")} • {pondConfig.seedCount.toLocaleString('en-IN')} రొయ్య పిల్లలు</p>
+          
+          <div className="mt-3 flex gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600">Market Place:</label>
+              <select 
+                value={marketRegion} 
+                onChange={(e) => setMarketRegion(e.target.value)}
+                className="text-xs border border-gray-300 rounded px-2 py-1"
+              >
+                <option value="Bhimavaram">Bhimavaram</option>
+                <option value="Nellore">Nellore</option>
+                <option value="Surat">Surat</option>
+                <option value="Ongole">Ongole</option>
+                <option value="Kakinada">Kakinada</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600">Count Size:</label>
+              <select 
+                value={countSize} 
+                onChange={(e) => setCountSize(Number(e.target.value) as CountSize)}
+                className="text-xs border border-gray-300 rounded px-2 py-1"
+              >
+                <option value={30}>30 count</option>
+                <option value={40}>40 count</option>
+                <option value={50}>50 count</option>
+                <option value={60}>60 count</option>
+                <option value={70}>70 count</option>
+                <option value={80}>80 count</option>
+                <option value={90}>90 count</option>
+                <option value={100}>100 count</option>
+              </select>
+            </div>
+          </div>
         </div>
         <span className="heading-orbit" aria-hidden="true">📈</span>
       </div>
@@ -144,6 +181,8 @@ export default function GrowthTracker() {
             latestRecord={latestRecord}
             adg={adg}
             biomass={biomass}
+            marketRegion={marketRegion}
+            countSize={countSize}
           />
         </div>
       </div>
@@ -167,46 +206,130 @@ function GrowthChart({
     )
   }
 
-  const chartData = useMemo(() =>
-    records.map((record) => {
-      const benchmark = benchmarks.find(b => b.doc === record.doc)
+  const chartData = useMemo(() => {
+    // Create a complete dataset with benchmarks interpolated for all DOC values
+    const data: Array<{ doc: number; mbw: number | null; benchmark: number | null }> = []
+    
+    // First, add all actual records
+    const recordsWithBenchmarks = records.map((record) => {
+      // Find the benchmark for this DOC (exact match or interpolation)
+      let benchmarkValue: number | null = null
+      
+      if (benchmarks.length > 0) {
+        // Find the two surrounding benchmark points
+        const lower = benchmarks.filter(b => b.doc <= record.doc).sort((a, b) => b.doc - a.doc)[0]
+        const upper = benchmarks.filter(b => b.doc >= record.doc).sort((a, b) => a.doc - b.doc)[0]
+        
+        if (lower && upper) {
+          if (lower.doc === record.doc) {
+            benchmarkValue = lower.expected_abw_g
+          } else if (upper.doc === record.doc) {
+            benchmarkValue = upper.expected_abw_g
+          } else if (lower.doc !== upper.doc) {
+            // Interpolate between lower and upper
+            const ratio = (record.doc - lower.doc) / (upper.doc - lower.doc)
+            benchmarkValue = lower.expected_abw_g + (upper.expected_abw_g - lower.expected_abw_g) * ratio
+          }
+        } else if (lower) {
+          benchmarkValue = lower.expected_abw_g
+        } else if (upper) {
+          benchmarkValue = upper.expected_abw_g
+        }
+      }
+      
       return {
         doc: record.doc,
         mbw: record.mbwGrams,
-        benchmark: benchmark ? benchmark.expected_abw_g : null
+        benchmark: benchmarkValue
       }
-    }),
-    [records, benchmarks]
-  )
+    })
+    
+    return recordsWithBenchmarks
+  }, [records, benchmarks])
 
   return (
-    <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="doc" name="Day of Culture" />
-          <YAxis name="Mean Body Weight (g)" domain={[0, 'dataMax']} />
-          <Tooltip />
-          <Legend />
-          <Line
-            type="monotone"
-            dataKey="mbw"
-            stroke="#3B82F6"
-            strokeWidth={2}
-            name="Actual MBW"
-          />
-          {benchmarks.length > 0 && (
+    <div>
+      {/* Recent sampling comparison */}
+      {chartData.length > 0 && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-semibold mb-2">Latest Sampling Comparison</h4>
+          {chartData.slice(-1).map((data, idx) => {
+            const latest = chartData[chartData.length - 1]
+            const benchmark = latest.benchmark || 0
+            const actual = latest.mbw || 0
+            const diffPercent = benchmark > 0 ? ((actual - benchmark) / benchmark * 100) : 0
+            const isAbove = actual > benchmark * 1.1
+            const isBelow = actual < benchmark * 0.9
+            
+            return (
+              <div key={idx} className="grid grid-cols-3 gap-2 text-sm">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">DOC</p>
+                  <p className="font-bold">{latest.doc}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Actual MBW</p>
+                  <p className="font-bold text-blue-600">{actual.toFixed(1)}g</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Benchmark</p>
+                  <p className="font-bold text-green-600">{benchmark.toFixed(1)}g</p>
+                </div>
+                <div className="col-span-3 text-center mt-1">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    isAbove ? 'bg-green-100 text-green-800' : 
+                    isBelow ? 'bg-red-100 text-red-800' : 
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {isAbove ? `${diffPercent.toFixed(0)}% above benchmark` :
+                     isBelow ? `${Math.abs(diffPercent).toFixed(0)}% below benchmark` :
+                     'On track'}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="doc" name="Day of Culture" tick={{ fontSize: 12 }} />
+            <YAxis name="Mean Body Weight (g)" domain={[0, 'dataMax']} tick={{ fontSize: 12 }} />
+            <Tooltip 
+              contentStyle={{ fontSize: '12px' }}
+              // @ts-ignore
+              formatter={(value: any, name: string | undefined) => [
+                `${value !== null ? `${value.toFixed(1)}g` : 'N/A'}`,
+                name === 'mbw' ? 'Actual MBW' : 'Vannamei Benchmark'
+              ]}
+            />
+            <Legend wrapperStyle={{ fontSize: '12px' }} />
             <Line
               type="monotone"
-              dataKey="benchmark"
-              stroke="#10B981"
+              dataKey="mbw"
+              stroke="#3B82F6"
               strokeWidth={2}
-              strokeDasharray="5 5"
-              name="Vannamei Benchmark"
+              name="Actual MBW"
+              dot={{ r: 4, strokeWidth: 2 }}
+              activeDot={{ r: 6 }}
             />
-          )}
-        </LineChart>
-      </ResponsiveContainer>
+            {benchmarks.length > 0 && (
+              <Line
+                type="monotone"
+                dataKey="benchmark"
+                stroke="#10B981"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                name="Vannamei Benchmark"
+                dot={{ r: 3, strokeWidth: 2 }}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }
@@ -659,12 +782,16 @@ function MetricsDashboard({
   pondConfig,
   latestRecord,
   adg,
-  biomass
+  biomass,
+  marketRegion,
+  countSize
 }: {
   pondConfig: PondConfig | null
   latestRecord: SamplingRecord | null
   adg: number | null
   biomass: number
+  marketRegion: string
+  countSize: CountSize
 }) {
   const fcr = useMemo(() =>
     latestRecord && pondConfig && biomass > 0
@@ -678,8 +805,9 @@ function MetricsDashboard({
 
   useEffect(() => {
     const loadPrice = async () => {
+      setPriceLoading(true)
       try {
-        const prices = await fetchMarketPrice('Bhimavaram', 40)
+        const prices = await fetchMarketPrice(marketRegion, countSize)
         if (prices.length > 0) {
           setCurrentPrice(prices[0].pricePerKg)
         }
@@ -690,7 +818,7 @@ function MetricsDashboard({
       }
     }
     void loadPrice()
-  }, [])
+  }, [marketRegion, countSize])
 
   const gcvm = useMemo(() =>
     pondConfig && latestRecord
@@ -736,7 +864,9 @@ function MetricsDashboard({
       <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
         <h4 className="font-semibold mb-2">Gross Crop Value</h4>
         <p className="text-2xl font-bold text-amber-800">₹{gcvm.toFixed(0)}</p>
-        <p className="text-sm text-gray-600">Estimated value at harvest (at ₹{currentPrice.toFixed(0)}/kg current market price)</p>
+        <p className="text-sm text-gray-600">
+          Estimated value at harvest (at ₹{currentPrice.toFixed(0)}/kg in {marketRegion} - {countSize} count)
+        </p>
         {priceLoading && <p className="text-xs text-gray-500 mt-1">Loading current price...</p>}
       </div>
 
