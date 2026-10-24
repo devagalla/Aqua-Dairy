@@ -255,7 +255,7 @@ function WorkspaceShellInner({
                 <option value="">Select a pond</option>
                 {ponds.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} {p.activeCycle && p.activeCycle.doc > 0 ? `(DOC ${p.activeCycle.doc})` : ''}
+                    {p.name}
                   </option>
                 ))}
               </select>
